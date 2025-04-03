@@ -7,7 +7,7 @@ MenuState::MenuState(GameDataRef data) : _data(data) {
 }
 
 void MenuState::Init(){
-    if (!_font.loadFromFile("assets/fonts/Poppins-Black.ttf")) {
+    if (!_font.loadFromFile("assets/fonts/Orbitron/Orbitron-VariableFont_wght.ttf")) {
         std::cout << "Failed to load font" << std::endl;
     }
 
@@ -44,6 +44,9 @@ void MenuState::HandleInput() {
 }
 
 void MenuState::Update() {
+    // sf::Vector2u windowSize = _data->window.getSize();
+    // _playButtonText->setPosition(windowSize.x * 0.5f, windowSize.y * 0.5f);  // Środek ekranu
+
     
 }
 

@@ -3,7 +3,7 @@
 
 
 int main() {
-    Game(800, 600, "RayStrike");
+    Game(1280, 900, "RayStrike");
     
     return 0;
 }
