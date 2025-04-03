@@ -22,5 +22,4 @@ private:
     sf::RectangleShape *_playButton;
     sf::Text *_playButtonText;
     
-
 };
