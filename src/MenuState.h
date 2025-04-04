@@ -35,4 +35,6 @@ private:
     sf::Text *_exitButtonText;
     
     std::unordered_map<sf::RectangleShape*, std::tuple<sf::Vector2f, sf::Vector2f, sf::FloatRect, sf::Color>> _buttonData;
+
+    sf::Sound *_soundtrack;
 };

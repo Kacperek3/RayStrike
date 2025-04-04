@@ -10,12 +10,20 @@ MenuState::MenuState(GameDataRef data) : _data(data) {
     _settingsButtonText = new sf::Text();
     _exitButton = new sf::RectangleShape();
     _exitButtonText = new sf::Text();
+
+    _soundtrack = new sf::Sound();
 }
 
 void MenuState::Init(){
     if (!_font.loadFromFile("assets/fonts/Orbitron/Orbitron-VariableFont_wght.ttf")) {
         std::cout << "Failed to load font" << std::endl;
     }
+
+    _data->soundManager.LoadSoundBuffer("soundtrack", "assets/sounds/menuSounds/soundracks/GameSoundtrack.wav");
+    _soundtrack->setBuffer(_data->soundManager.GetSoundBuffer("soundtrack"));
+    _soundtrack->setLoop(true);
+    _soundtrack->setVolume(20);
+    _soundtrack->play();
 
     _titleText->setFont(_font);
     _titleText->setString("RayStrike");
@@ -169,9 +177,12 @@ MenuState::~MenuState() {
 
     delete _exitButton;
     delete _exitButtonText;
+
+    delete _soundtrack;
 }
 
 
 void MenuState::ClearObjects() {
     _data->assetManager.clearAssets();
+    _data->soundManager.ClearSounds();
 }
