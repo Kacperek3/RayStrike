@@ -1,7 +1,10 @@
 #include "MenuState.h"
 
 MenuState::MenuState(GameDataRef data) : _data(data) {
+    srand(static_cast<unsigned>(time(NULL)));
+
     _titleText = new sf::Text();
+    _copyrightText = new sf::Text();
     _createGameButton = new sf::RectangleShape();
     _createGameButtonText = new sf::Text();
     _joinGameButton = new sf::RectangleShape();
@@ -12,6 +15,8 @@ MenuState::MenuState(GameDataRef data) : _data(data) {
     _exitButtonText = new sf::Text();
 
     _soundtrack = new sf::Sound();
+    
+    _bullet = new sf::Sprite();
 }
 
 void MenuState::Init(){
@@ -30,6 +35,13 @@ void MenuState::Init(){
     _titleText->setCharacterSize(50);
     _titleText->setFillColor(sf::Color::White);
     _titleText->setPosition(500, 100);
+
+
+    _copyrightText->setFont(_font);
+    _copyrightText->setString("Kacper & Piotr Studios 2025");
+    _copyrightText->setCharacterSize(17);
+    _copyrightText->setFillColor(sf::Color::White);
+    _copyrightText->setPosition(70, 850);
 
     _createGameButton->setSize(sf::Vector2f(350, 50));
     _createGameButton->setFillColor(sf::Color::Blue);
@@ -87,6 +99,18 @@ void MenuState::Init(){
     storeButtonData(_joinGameButton, _joinGameButtonText);
     storeButtonData(_settingsButton, _settingsButtonText);
     storeButtonData(_exitButton, _exitButtonText);
+
+
+
+    _data->assetManager.LoadTexture("bullet", "assets/bullet.png");
+    _bullet->setTexture(_data->assetManager.GetTexture("bullet"));
+    _bullet->setScale(3.0f, 3.0f);
+
+    _bulletSpeed = 8.0f;
+    _windowSize = _data->window.getSize();
+    
+    // Początkowe ustawienie pocisku
+    ResetBulletPositionAndVelocity();
 }
 
 void MenuState::HandleInput() {
@@ -142,12 +166,70 @@ void MenuState::Update() {
             if (text) text->setPosition(originalTxtPos);
         }
     }
+
+
+    _bullet->move(_bulletVelocity);
+
+    
+    sf::FloatRect bulletBounds = _bullet->getGlobalBounds();
+    if (bulletBounds.left + bulletBounds.width < 0 || 
+        bulletBounds.left > _windowSize.x ||
+        bulletBounds.top + bulletBounds.height < 0 ||
+        bulletBounds.top > _windowSize.y) {
+        ResetBulletPositionAndVelocity();
+    }
+
+    float angle = atan2(_bulletVelocity.y, _bulletVelocity.x) * 180 / 3.14159265f;
+    _bullet->setRotation(angle);
 }
+
+
+void MenuState::ResetBulletPositionAndVelocity() {
+
+    int edge = rand() % 4;
+    float x, y;
+
+    switch (edge) {
+        case 0:
+            x = -_bullet->getGlobalBounds().width;
+            y = static_cast<float>(rand() % _windowSize.y);
+            break;
+        case 1:
+            x = static_cast<float>(_windowSize.x);
+            y = static_cast<float>(rand() % _windowSize.y);
+            break;
+        case 2: 
+            x = static_cast<float>(rand() % _windowSize.x);
+            y = -_bullet->getGlobalBounds().height;
+            break;
+        case 3: 
+            x = static_cast<float>(rand() % _windowSize.x);
+            y = static_cast<float>(_windowSize.y);
+            break;
+    }
+
+    _bullet->setPosition(x, y);
+
+    sf::Vector2f target(
+        static_cast<float>(rand() % _windowSize.x),
+        static_cast<float>(rand() % _windowSize.y)
+    );
+
+    sf::Vector2f direction = target - _bullet->getPosition();
+    float length = sqrt(direction.x * direction.x + direction.y * direction.y);
+    if (length != 0) {
+        _bulletVelocity = (direction / length) * _bulletSpeed;
+    }
+}
+
+
 
 void MenuState::Draw() {
     _data->window.clear();
+    _data->window.draw(*_bullet);
 
     _data->window.draw(*_titleText);
+    _data->window.draw(*_copyrightText);
     _data->window.draw(*_createGameButton);
     _data->window.draw(*_createGameButtonText);
 
@@ -165,7 +247,9 @@ void MenuState::Draw() {
 
 
 MenuState::~MenuState() {
+    delete _bullet;
     delete _titleText;
+    delete _copyrightText;
     delete _createGameButton;
     delete _createGameButtonText;
 

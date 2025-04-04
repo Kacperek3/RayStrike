@@ -3,6 +3,8 @@
 #include "Game.h"
 #include "State.h"
 #include <unordered_map>
+#include <ctime>
+#include <cmath>
 
 
 class MenuState : public State {
@@ -18,9 +20,15 @@ public:
 
 
 private:
+    void ResetBulletPositionAndVelocity();
+
+
+
+
     GameDataRef _data;
     sf::Font _font;
     sf::Text *_titleText;
+    sf::Text *_copyrightText;
 
     sf::RectangleShape *_createGameButton;
     sf::Text *_createGameButtonText;
@@ -37,4 +45,9 @@ private:
     std::unordered_map<sf::RectangleShape*, std::tuple<sf::Vector2f, sf::Vector2f, sf::FloatRect, sf::Color>> _buttonData;
 
     sf::Sound *_soundtrack;
+
+    sf::Sprite *_bullet;
+    sf::Vector2f _bulletVelocity;
+    float _bulletSpeed;
+    sf::Vector2u _windowSize;
 };
