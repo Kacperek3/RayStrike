@@ -15,6 +15,12 @@ struct GameData {
     AssetManager assetManager;
     InputManager inputManager;
     SoundManager soundManager;
+
+    bool isFullscreen = false;
+    unsigned int windowedWidth;
+    unsigned int windowedHeight;
+    std::string windowTitle;
+    sf::Vector2u originalResolution = {1280, 900};
 };
 
 typedef std::shared_ptr<GameData> GameDataRef;
