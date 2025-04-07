@@ -20,13 +20,19 @@ public:
 
 
 private:
-    void ResetBulletPositionAndVelocity();
+    struct Bullet {
+        sf::Sprite sprite;
+        sf::Vector2f velocity;
+        bool isGroupBullet = false;
+    };
 
-
+    void ResetBullet(Bullet& bullet, bool initialSpawn = false);
 
 
     GameDataRef _data;
     sf::Font _font;
+    sf::Sprite *_backgroundTexture;
+
     sf::Text *_titleText;
     sf::Text *_copyrightText;
 
@@ -46,8 +52,12 @@ private:
 
     sf::Sound *_soundtrack;
 
-    sf::Sprite *_bullet;
-    sf::Vector2f _bulletVelocity;
+
+    
+
+    std::vector<Bullet> _bullets;
     float _bulletSpeed;
     sf::Vector2u _windowSize;
+    float _groupSpawnChance = 0.3f;
+    int _maxGroupSize = 5;
 };

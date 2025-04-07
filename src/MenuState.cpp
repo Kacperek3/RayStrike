@@ -5,6 +5,7 @@ MenuState::MenuState(GameDataRef data) : _data(data) {
 
     _titleText = new sf::Text();
     _copyrightText = new sf::Text();
+    _backgroundTexture = new sf::Sprite();
     _createGameButton = new sf::RectangleShape();
     _createGameButtonText = new sf::Text();
     _joinGameButton = new sf::RectangleShape();
@@ -16,13 +17,17 @@ MenuState::MenuState(GameDataRef data) : _data(data) {
 
     _soundtrack = new sf::Sound();
     
-    _bullet = new sf::Sprite();
+    _bulletSpeed = 8.0f;
+    _windowSize = _data->window.getSize();
 }
 
 void MenuState::Init(){
     if (!_font.loadFromFile("assets/fonts/Orbitron/Orbitron-VariableFont_wght.ttf")) {
         std::cout << "Failed to load font" << std::endl;
     }
+
+    _data->assetManager.LoadTexture("background", "assets/background.jpg");
+    _backgroundTexture->setTexture(_data->assetManager.GetTexture("background"));
 
     _data->soundManager.LoadSoundBuffer("soundtrack", "assets/sounds/menuSounds/soundracks/GameSoundtrack.wav");
     _soundtrack->setBuffer(_data->soundManager.GetSoundBuffer("soundtrack"));
@@ -44,7 +49,7 @@ void MenuState::Init(){
     _copyrightText->setPosition(70, 850);
 
     _createGameButton->setSize(sf::Vector2f(350, 50));
-    _createGameButton->setFillColor(sf::Color::Blue);
+    _createGameButton->setFillColor(sf::Color(80, 150, 255,150));
     _createGameButton->setPosition(300, 300);
 
     _createGameButtonText->setFont(_font);
@@ -55,7 +60,7 @@ void MenuState::Init(){
 
 
     _joinGameButton->setSize(sf::Vector2f(350, 50));
-    _joinGameButton->setFillColor(sf::Color::Blue);
+    _joinGameButton->setFillColor(sf::Color(80, 150, 255,150));
     _joinGameButton->setPosition(300, 390);
 
     _joinGameButtonText->setFont(_font);
@@ -66,7 +71,7 @@ void MenuState::Init(){
 
 
     _settingsButton->setSize(sf::Vector2f(350, 50));
-    _settingsButton->setFillColor(sf::Color::Blue);
+    _settingsButton->setFillColor(sf::Color(80, 150, 255,150));
     _settingsButton->setPosition(300, 480);
 
     _settingsButtonText->setFont(_font);
@@ -77,7 +82,7 @@ void MenuState::Init(){
 
 
     _exitButton->setSize(sf::Vector2f(350, 50));
-    _exitButton->setFillColor(sf::Color::Blue);
+    _exitButton->setFillColor(sf::Color(80, 150, 255,150));
     _exitButton->setPosition(300, 570);
 
     _exitButtonText->setFont(_font);
@@ -102,15 +107,15 @@ void MenuState::Init(){
 
 
 
-    _data->assetManager.LoadTexture("bullet", "assets/bullet.png");
-    _bullet->setTexture(_data->assetManager.GetTexture("bullet"));
-    _bullet->setScale(3.0f, 3.0f);
-
-    _bulletSpeed = 8.0f;
-    _windowSize = _data->window.getSize();
-    
-    // Początkowe ustawienie pocisku
-    ResetBulletPositionAndVelocity();
+    _data->assetManager.LoadTexture("bulletBlue", "assets/bulletBlue.png");
+    _data->assetManager.LoadTexture("bulletRed", "assets/bulletRed.png");
+    _bullets.resize(5);
+    for(auto& bullet : _bullets){
+        bool isRed = (rand() % 2 == 0);
+        bullet.sprite.setTexture(_data->assetManager.GetTexture(isRed ? "bulletRed" : "bulletBlue"));
+        bullet.sprite.setScale(3.0f, 3.0f);
+        ResetBullet(bullet, true);
+    }
 }
 
 void MenuState::HandleInput() {
@@ -168,65 +173,118 @@ void MenuState::Update() {
     }
 
 
-    _bullet->move(_bulletVelocity);
+    for(auto& bullet : _bullets){
+        // Poruszanie
+        bullet.sprite.move(bullet.velocity);
+        
+        // Sprawdź czy poza ekranem
+        sf::FloatRect bounds = bullet.sprite.getGlobalBounds();
+        if(bounds.left + bounds.width < 0 || 
+           bounds.left > _windowSize.x ||
+           bounds.top + bounds.height < 0 || 
+           bounds.top > _windowSize.y){
+           ResetBullet(bullet);
+        }
 
+        // Obracanie
+        float angle = atan2(bullet.velocity.y, bullet.velocity.x) * 180 / 3.14159265f;
+        bullet.sprite.setRotation(angle);
+    }
+}
+
+
+void MenuState::ResetBullet(Bullet& bullet, bool initialSpawn) {
+    const int MAX_BULLETS = 6;
+    const float LINE_SPACING = 50.0f; // Odstęp między pociskami w linii
     
-    sf::FloatRect bulletBounds = _bullet->getGlobalBounds();
-    if (bulletBounds.left + bulletBounds.width < 0 || 
-        bulletBounds.left > _windowSize.x ||
-        bulletBounds.top + bulletBounds.height < 0 ||
-        bulletBounds.top > _windowSize.y) {
-        ResetBulletPositionAndVelocity();
+    bool isRed = (rand() % 2 == 0); // 50% szans na czerwony pocisk
+    bullet.sprite.setTexture(_data->assetManager.GetTexture(isRed ? "bulletRed" : "bulletBlue"));
+    // Losowa krawędź
+    int edge = initialSpawn ? rand() % 4 : rand() % 2 ? 0 : 1;
+    
+    // Losowa pozycja startowa
+    sf::Vector2f startPos;
+    switch(edge){
+        case 0: // Lewa
+            startPos = {-100.f, static_cast<float>(rand() % _windowSize.y)};
+            break;
+        case 1: // Prawa
+            startPos = {static_cast<float>(_windowSize.x + 100), static_cast<float>(rand() % _windowSize.y)};
+            break;
+        case 2: // Góra
+            startPos = {static_cast<float>(rand() % _windowSize.x), -100.f};
+            break;
+        case 3: // Dół
+            startPos = {static_cast<float>(rand() % _windowSize.x), static_cast<float>(_windowSize.y + 100)};
+            break;
+    }
+    
+    // Cel w przeciwnej połowie ekranu
+    sf::Vector2f target;
+    if(edge == 0 || edge == 1){ // Poziomy ruch
+        target = {
+            edge == 0 ? static_cast<float>(_windowSize.x + 100) : -100.f,
+            static_cast<float>(rand() % _windowSize.y)
+        };
+    } else { // Pionowy ruch
+        target = {
+            static_cast<float>(rand() % _windowSize.x),
+            edge == 2 ? static_cast<float>(_windowSize.y + 100) : -100.f
+        };
     }
 
-    float angle = atan2(_bulletVelocity.y, _bulletVelocity.x) * 180 / 3.14159265f;
-    _bullet->setRotation(angle);
+    // Kierunek ruchu
+    sf::Vector2f direction = target - startPos;
+    float length = sqrt(direction.x*direction.x + direction.y*direction.y);
+    bullet.velocity = (direction / length) * _bulletSpeed;
+    bullet.sprite.setPosition(startPos);
+
+    // Losowa szansa na grupę
+    if(!initialSpawn && (rand() % 100) < (_groupSpawnChance * 100)){
+        int groupSize = 2 + rand() % (_maxGroupSize - 1);
+        bool isLineFormation = (rand() % 2 == 0); // 50% szans na formację liniową
+
+        for(int i = 0; i < groupSize; i++){
+            if(_bullets.size() >= MAX_BULLETS) break;
+
+            Bullet newBullet;
+            newBullet.sprite.setTexture(_data->assetManager.GetTexture((rand() % 2 == 0) ? "bulletRed" : "bulletBlue"));
+            newBullet.sprite.setScale(3.0f, 3.0f);
+
+            if(isLineFormation) {
+                // Formacja liniowa - pociski lecą jeden za drugim
+                sf::Vector2f offset = (-direction) * (LINE_SPACING * static_cast<float>(i + 1));
+                newBullet.sprite.setPosition(startPos + offset);
+                newBullet.velocity = direction * _bulletSpeed;
+            } else {
+                // Standardowa formacja z losowym kątem
+                float angleVariation = (rand() % 30 - 15) * 3.14159265f / 180.f;
+                sf::Vector2f groupDirection = {
+                    direction.x * cos(angleVariation) - direction.y * sin(angleVariation),
+                    direction.x * sin(angleVariation) + direction.y * cos(angleVariation)
+                };
+                groupDirection = groupDirection / length * _bulletSpeed;
+                newBullet.velocity = groupDirection;
+                newBullet.sprite.setPosition(startPos);
+            }
+
+            newBullet.sprite.setRotation(atan2(newBullet.velocity.y, newBullet.velocity.x) * 180 / 3.14159265f);
+            newBullet.isGroupBullet = true;
+            
+            _bullets.push_back(newBullet);
+        }
+    }
 }
 
-
-void MenuState::ResetBulletPositionAndVelocity() {
-
-    int edge = rand() % 4;
-    float x, y;
-
-    switch (edge) {
-        case 0:
-            x = -_bullet->getGlobalBounds().width;
-            y = static_cast<float>(rand() % _windowSize.y);
-            break;
-        case 1:
-            x = static_cast<float>(_windowSize.x);
-            y = static_cast<float>(rand() % _windowSize.y);
-            break;
-        case 2: 
-            x = static_cast<float>(rand() % _windowSize.x);
-            y = -_bullet->getGlobalBounds().height;
-            break;
-        case 3: 
-            x = static_cast<float>(rand() % _windowSize.x);
-            y = static_cast<float>(_windowSize.y);
-            break;
-    }
-
-    _bullet->setPosition(x, y);
-
-    sf::Vector2f target(
-        static_cast<float>(rand() % _windowSize.x),
-        static_cast<float>(rand() % _windowSize.y)
-    );
-
-    sf::Vector2f direction = target - _bullet->getPosition();
-    float length = sqrt(direction.x * direction.x + direction.y * direction.y);
-    if (length != 0) {
-        _bulletVelocity = (direction / length) * _bulletSpeed;
-    }
-}
 
 
 
 void MenuState::Draw() {
     _data->window.clear();
-    _data->window.draw(*_bullet);
+    _data->window.draw(*_backgroundTexture);
+    for(const auto& bullet : _bullets){
+        _data->window.draw(bullet.sprite);
+    }
 
     _data->window.draw(*_titleText);
     _data->window.draw(*_copyrightText);
@@ -247,7 +305,8 @@ void MenuState::Draw() {
 
 
 MenuState::~MenuState() {
-    delete _bullet;
+    _bullets.clear();
+    delete _backgroundTexture;
     delete _titleText;
     delete _copyrightText;
     delete _createGameButton;
