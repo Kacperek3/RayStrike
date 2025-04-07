@@ -50,8 +50,9 @@ private:
     
     std::unordered_map<sf::RectangleShape*, std::tuple<sf::Vector2f, sf::Vector2f, sf::FloatRect, sf::Color>> _buttonData;
 
-    sf::Sound *_soundtrack;
-
+    bool _isExiting = false;
+    bool isComingFromSettings = false;
+    const float _exitAnimationSpeed = 50.0f;
 
     
 
@@ -60,4 +61,6 @@ private:
     sf::Vector2u _windowSize;
     float _groupSpawnChance = 0.3f;
     int _maxGroupSize = 5;
+
+
 };

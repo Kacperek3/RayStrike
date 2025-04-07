@@ -21,6 +21,7 @@ struct GameData {
     unsigned int windowedHeight;
     std::string windowTitle;
     sf::Vector2u originalResolution = {1280, 900};
+    sf::Sound menuSoundtrack;
 };
 
 typedef std::shared_ptr<GameData> GameDataRef;
@@ -28,6 +29,7 @@ typedef std::shared_ptr<GameData> GameDataRef;
 class Game {
 public:
     Game(int width, int height, std::string title);
+    
 private:
     GameDataRef _data = std::make_shared<GameData>();
     void Run();
