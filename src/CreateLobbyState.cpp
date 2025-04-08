@@ -5,6 +5,9 @@ CreateLobbyState::CreateLobbyState(GameDataRef data) : _data(data) {
 
     _backgroundTexture = new sf::Sprite();
     _titleText = new sf::Text();
+
+    _backButton = new sf::RectangleShape();
+    _backButtonText = new sf::Text();
 }
 
 void CreateLobbyState::Init(){
@@ -19,10 +22,29 @@ void CreateLobbyState::Init(){
     _titleText->setString("Create Lobby");
     _titleText->setCharacterSize(50);
     _titleText->setFillColor(sf::Color::White);
-
-
     _titleText->setPosition(_data->window.getSize().x,100);
-   
+
+    _backButton->setSize(sf::Vector2f(250, 50));
+    _backButton->setFillColor(sf::Color(80, 150, 255,150));
+    _backButton->setPosition(300, 700);
+
+    _backButtonText->setFont(_font);
+    _backButtonText->setString("Back");
+    _backButtonText->setCharacterSize(30);
+    _backButtonText->setFillColor(sf::Color::White);
+    _backButtonText->setPosition(370, 708);
+
+    auto storeButtonData = [&](sf::RectangleShape* btn, sf::Text* txt) {
+        sf::Vector2f originalBtnPos = sf::Vector2f(300, 700);
+        sf::Vector2f originalTxtPos = sf::Vector2f(370, 708);
+        sf::FloatRect originalBounds = btn->getGlobalBounds();
+        sf::Color originalColor = btn->getFillColor();
+        _buttonData[btn] = {originalBtnPos, originalTxtPos, originalBounds, originalColor};
+    };
+    storeButtonData(_backButton, _backButtonText);  
+
+    _backButton->setPosition(1100, 700);
+    _backButtonText->setPosition(1170, 708);
 }
 
 void CreateLobbyState::HandleInput() {
@@ -35,7 +57,9 @@ void CreateLobbyState::HandleInput() {
         if(event.type == sf::Event::MouseButtonPressed ) {
             if (event.mouseButton.button == sf::Mouse::Left) {
                 sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
-                _animationState = AnimationState::EXITING;
+                if (_backButton->getGlobalBounds().contains(mousePos)) {
+                    _animationState = AnimationState::EXITING;
+                }
             }
             return;
         }
@@ -59,24 +83,72 @@ void CreateLobbyState::Update() {
 
 void CreateLobbyState::exitingAnimation() {
     
+    bool allButtonsOffScreen = false;
+
+    for (auto& [button, data] : _buttonData) {
+        auto& [originalBtnPos, originalTxtPos, originalBounds, originalColor] = data;
+        
+        sf::Vector2f newPos = button->getPosition();
+        newPos.x += _exitAnimationSpeed;
+        button->setPosition(newPos);
+        _titleText->setPosition(_titleText->getPosition().x + _exitAnimationSpeed, _titleText->getPosition().y);
+
+
+        sf::Text* text = nullptr;
+        if (button == _backButton) text = _backButtonText;
+        
+        if (text) {
+            sf::Vector2f textPos = text->getPosition();
+            textPos.x += _exitAnimationSpeed;
+            text->setPosition(textPos);
+        }
+        if (newPos.x >= _data->window.getSize().x) {
+            allButtonsOffScreen = true;
+        }
+    }
+
     sf::Vector2f currentPos = _titleText->getPosition();
 
     if (currentPos.x < _data->window.getSize().x) {
         currentPos.x += _exitAnimationSpeed;
-        if (currentPos.x >= _data->window.getSize().x){
-            currentPos.x = _data->window.getSize().x;
-            _animationState = AnimationState::ENTERING;
-            _data->stateManager.RemoveState();
-        }
-        
         _titleText->setPosition(currentPos);
-
+    }
+    if (currentPos.x >= _data->window.getSize().x && allButtonsOffScreen) {
+        currentPos.x = _data->window.getSize().x;
+        _animationState = AnimationState::ENTERING;
+        _data->stateManager.RemoveState();
     }
     
     return;
 }
 
 void CreateLobbyState::enteringAnimation() {
+    bool allButtonsOffScreen = true;
+
+    for (auto& [button, data] : _buttonData) {
+        auto& [originalBtnPos, originalTxtPos, originalBounds, originalColor] = data;
+        
+        sf::Vector2f newPos = button->getPosition();
+        newPos.x -= _exitAnimationSpeed;
+        button->setPosition(newPos);
+        _titleText->setPosition(_titleText->getPosition().x - _exitAnimationSpeed, _titleText->getPosition().y);
+
+
+        sf::Text* text = nullptr;
+        if (button == _backButton) text = _backButtonText;
+        
+        if (text) {
+            sf::Vector2f textPos = text->getPosition();
+            textPos.x -= _exitAnimationSpeed;
+            text->setPosition(textPos);
+        }
+
+        sf::FloatRect bounds = button->getGlobalBounds();
+        if (bounds.left + bounds.width > 0) {
+            allButtonsOffScreen = false;
+        }
+    }
+
     sf::Vector2f currentPos = _titleText->getPosition();
 
     if (currentPos.x > 0) {
@@ -92,7 +164,27 @@ void CreateLobbyState::enteringAnimation() {
 }
 
 void CreateLobbyState::standartAnimation(){
-    return;
+    sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
+    const float hoverOffset = 10.f;
+    const sf::Color hoverColor(0, 59, 190);
+    for (auto& [button, data] : _buttonData) {
+        auto& [originalBtnPos, originalTxtPos, originalBounds, originalColor] = data;
+        sf::Text* text = nullptr;
+
+        if (button == _backButton) text = _backButtonText;
+        
+
+        
+        if (originalBounds.contains(mousePos)) {
+            button->setPosition(originalBtnPos.x + hoverOffset, originalBtnPos.y);
+            button->setFillColor(hoverColor);
+            if (text) text->setPosition(originalTxtPos.x + hoverOffset, originalTxtPos.y);
+        } else {
+            button->setPosition(originalBtnPos);
+            button->setFillColor(originalColor);
+            if (text) text->setPosition(originalTxtPos);
+        }
+    }
 }
 
 
@@ -103,6 +195,9 @@ void CreateLobbyState::Draw() {
     _data->window.draw(*_backgroundTexture);
     _data->window.draw(*_titleText);
 
+    _data->window.draw(*_backButton);
+    _data->window.draw(*_backButtonText);
+
     _data->window.display();
 }
 
@@ -110,6 +205,8 @@ void CreateLobbyState::Draw() {
 CreateLobbyState::~CreateLobbyState() {
     delete _backgroundTexture;
     delete _titleText;
+    delete _backButton;
+    delete _backButtonText;
     
 }
 
