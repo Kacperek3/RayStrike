@@ -1,9 +1,10 @@
 #include "MenuState.h"
 #include "SettingsState.h"
+#include "CreateLobbyState.h"
+#include "JoinLobbyState.h"
 
 MenuState::MenuState(GameDataRef data) : _data(data) {
     srand(static_cast<unsigned>(time(NULL)));
-    _isExiting = false;
     _titleText = new sf::Text();
     _copyrightText = new sf::Text();
     _backgroundTexture = new sf::Sprite();
@@ -29,7 +30,7 @@ void MenuState::Init(){
     _data->assetManager.LoadTexture("background", "assets/background.jpg");
     _backgroundTexture->setTexture(_data->assetManager.GetTexture("background"));
 
-_data->soundManager.LoadSoundBuffer("soundtrack", "assets/sounds/menuSounds/soundracks/GameSoundtrack.wav");
+    _data->soundManager.LoadSoundBuffer("soundtrack", "assets/sounds/menuSounds/soundracks/GameSoundtrack.wav");
     
     // Użyj dźwięku z GameData zamiast lokalnego
     _data->menuSoundtrack.setBuffer(_data->soundManager.GetSoundBuffer("soundtrack"));
@@ -108,7 +109,6 @@ _data->soundManager.LoadSoundBuffer("soundtrack", "assets/sounds/menuSounds/soun
     storeButtonData(_exitButton, _exitButtonText);
 
 
-
     _data->assetManager.LoadTexture("bulletBlue", "assets/bulletBlue.png");
     _data->assetManager.LoadTexture("bulletRed", "assets/bulletRed.png");
     _bullets.resize(5);
@@ -131,14 +131,16 @@ void MenuState::HandleInput() {
             if (event.mouseButton.button == sf::Mouse::Left) {
                 sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
                 if (_createGameButton->getGlobalBounds().contains(mousePos)) {
-                    //_data->stateManager.AddState(StateRef(new CreateGameState(_data)));
+                    _animationState = AnimationState::EXITING;
+                    _state = State::CREATE_GAME;
                 }
                 else if (_joinGameButton->getGlobalBounds().contains(mousePos)) {
-                    //_data->stateManager.AddState(StateRef(new JoinGameState(_data)));
+                    _animationState = AnimationState::EXITING;
+                    _state = State::JOIN_GAME;
                 }
                 else if (_settingsButton->getGlobalBounds().contains(mousePos)) {
-                    _isExiting = true;
-                    //_data->stateManager.AddState(StateRef(new SettingsState(_data)));
+                    _animationState = AnimationState::EXITING;
+                    _state = State::SETTINGS;
                 }
                 else if (_exitButton->getGlobalBounds().contains(mousePos)) {
                     _data->window.close();
@@ -151,11 +153,6 @@ void MenuState::HandleInput() {
 }
 
 void MenuState::Update() {
-    sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
-    const float hoverOffset = 10.f;
-    const sf::Color hoverColor(0, 59, 190);
-
-
     for(auto& bullet : _bullets){
         bullet.sprite.move(bullet.velocity);
         
@@ -167,128 +164,147 @@ void MenuState::Update() {
            ResetBullet(bullet);
         }
 
-
         float angle = atan2(bullet.velocity.y, bullet.velocity.x) * 180 / 3.14159265f;
         bullet.sprite.setRotation(angle);
     }
 
-    if (_isExiting) {
-        bool allButtonsOffScreen = true;
-
-        for (auto& [button, data] : _buttonData) {
-            auto& [originalBtnPos, originalTxtPos, originalBounds, originalColor] = data;
-            
-            sf::Vector2f newPos = button->getPosition();
-            newPos.x -= _exitAnimationSpeed;
-            button->setPosition(newPos);
-            _titleText->setPosition(_titleText->getPosition().x - _exitAnimationSpeed, _titleText->getPosition().y);
-
-
-            sf::Text* text = nullptr;
-            if (button == _createGameButton) text = _createGameButtonText;
-            else if (button == _joinGameButton) text = _joinGameButtonText;
-            else if (button == _settingsButton) text = _settingsButtonText;
-            else if (button == _exitButton) text = _exitButtonText;
-
-            if (text) {
-                sf::Vector2f textPos = text->getPosition();
-                textPos.x -= _exitAnimationSpeed;
-                text->setPosition(textPos);
-            }
-
-            sf::FloatRect bounds = button->getGlobalBounds();
-            if (bounds.left + bounds.width > 0) {
-                allButtonsOffScreen = false;
-            }
-        }
-        
-        if (allButtonsOffScreen) {
-            std::cout << "All buttons are off screen, exiting to settings." << std::endl;
-
-            this->_isExiting = false;
-            this->isComingFromSettings = true;
-            _data->stateManager.AddState(StateRef(new SettingsState(_data)),false);
-        }
-
+    if (_animationState == AnimationState::EXITING) {
+        exitingAnimation();
         return;
     }
-    else if (isComingFromSettings) {
-        for (auto& [button, data] : _buttonData) {
-            auto& [originalBtnPos, originalTxtPos, originalBounds, originalColor] = data;
-
-            // Pobierz aktualną pozycję przycisku
-            sf::Vector2f newPos = button->getPosition();
-
-            // Jeśli przycisk jest poza ekranem (x < 300), przesuwaj go w prawo
-            if (newPos.x < 300) {
-                newPos.x += _exitAnimationSpeed; // Przesuwaj w prawo
-                if (newPos.x > 300) {
-                    newPos.x = 300; // Zatrzymaj na pozycji docelowej
-                }
-                button->setPosition(newPos);
-            }
-
-            // Przesuń tekst powiązany z przyciskiem
-            sf::Text* text = nullptr;
-            if (button == _createGameButton) text = _createGameButtonText;
-            else if (button == _joinGameButton) text = _joinGameButtonText;
-            else if (button == _settingsButton) text = _settingsButtonText;
-            else if (button == _exitButton) text = _exitButtonText;
-
-            if (text) {
-                sf::Vector2f textPos = text->getPosition();
-                if (textPos.x < 300) {
-                    textPos.x += _exitAnimationSpeed; // Przesuwaj w prawo
-                    if (textPos.x > 300) {
-                        textPos.x = 300; // Zatrzymaj na pozycji docelowej
-                    }
-                    text->setPosition(textPos);
-                }
-            }
-
-            // Sprawdź, czy wszystkie przyciski są na ekranie
-            sf::FloatRect bounds = button->getGlobalBounds();
-        }
-        if (_titleText->getPosition().x < 0) {
-            _titleText->setPosition(0, 100); // Start poza ekranem
-        }
-
-        sf::Vector2f currentPos = _titleText->getPosition();
-
-        if (currentPos.x < 500) {
-            currentPos.x += _exitAnimationSpeed;
-            if (currentPos.x >= 500) {
-                currentPos.x = 500; 
-                isComingFromSettings = false;
-            }
-        }
-
-        _titleText->setPosition(currentPos);
+    else if (_animationState == AnimationState::ENTERING) {
+        enteringAnimation();   
+        return;
     }
-    else
-    {
-        for (auto& [button, data] : _buttonData) {
-            auto& [originalBtnPos, originalTxtPos, originalBounds, originalColor] = data;
-            sf::Text* text = nullptr;
+    else if(_animationState == AnimationState::NONE) {
+        standartAnimation();
+        return;
+    }
 
-            if (button == _createGameButton) text = _createGameButtonText;
-            else if (button == _joinGameButton) text = _joinGameButtonText;
-            else if (button == _settingsButton) text = _settingsButtonText;
-            else if (button == _exitButton) text = _exitButtonText;
+}
 
-            
-            if (originalBounds.contains(mousePos)) {
-                button->setPosition(originalBtnPos.x + hoverOffset, originalBtnPos.y);
-                button->setFillColor(hoverColor);
-                if (text) text->setPosition(originalTxtPos.x + hoverOffset, originalTxtPos.y);
-            } else {
-                button->setPosition(originalBtnPos);
-                button->setFillColor(originalColor);
-                if (text) text->setPosition(originalTxtPos);
-            }
+
+void MenuState::exitingAnimation() {
+    bool allButtonsOffScreen = true;
+
+    for (auto& [button, data] : _buttonData) {
+        auto& [originalBtnPos, originalTxtPos, originalBounds, originalColor] = data;
+        
+        sf::Vector2f newPos = button->getPosition();
+        newPos.x -= _exitAnimationSpeed;
+        button->setPosition(newPos);
+        _titleText->setPosition(_titleText->getPosition().x - _exitAnimationSpeed, _titleText->getPosition().y);
+
+
+        sf::Text* text = nullptr;
+        if (button == _createGameButton) text = _createGameButtonText;
+        else if (button == _joinGameButton) text = _joinGameButtonText;
+        else if (button == _settingsButton) text = _settingsButtonText;
+        else if (button == _exitButton) text = _exitButtonText;
+
+        if (text) {
+            sf::Vector2f textPos = text->getPosition();
+            textPos.x -= _exitAnimationSpeed;
+            text->setPosition(textPos);
+        }
+
+        sf::FloatRect bounds = button->getGlobalBounds();
+        if (bounds.left + bounds.width > 0) {
+            allButtonsOffScreen = false;
         }
     }
-    //std::cout <<"is comming: " <<isComingFromSettings << std::endl << _isExiting << std::endl;
+    
+    if (allButtonsOffScreen) {
+        std::cout << "All buttons are off screen, exiting to settings." << std::endl;
+
+        _animationState = AnimationState::ENTERING;
+        
+        if (_state == State::CREATE_GAME) {
+            _data->stateManager.AddState(StateRef(new CreateLobbyState(_data)), false);
+        }
+        else if (_state == State::SETTINGS) {
+            _data->stateManager.AddState(StateRef(new SettingsState(_data)), false);
+        }
+        else if (_state == State::JOIN_GAME) {
+            _data->stateManager.AddState(StateRef(new JoinLobbyState(_data)), false);
+        }
+    }
+}
+void MenuState::enteringAnimation(){
+    for (auto& [button, data] : _buttonData) {
+        auto& [originalBtnPos, originalTxtPos, originalBounds, originalColor] = data;
+
+        // Pobierz aktualną pozycję przycisku
+        sf::Vector2f newPos = button->getPosition();
+
+        // Jeśli przycisk jest poza ekranem (x < 300), przesuwaj go w prawo
+        if (newPos.x < 300) {
+            newPos.x += _exitAnimationSpeed; // Przesuwaj w prawo
+            if (newPos.x > 300) {
+                newPos.x = 300; // Zatrzymaj na pozycji docelowej
+            }
+            button->setPosition(newPos);
+        }
+
+        // Przesuń tekst powiązany z przyciskiem
+        sf::Text* text = nullptr;
+        if (button == _createGameButton) text = _createGameButtonText;
+        else if (button == _joinGameButton) text = _joinGameButtonText;
+        else if (button == _settingsButton) text = _settingsButtonText;
+        else if (button == _exitButton) text = _exitButtonText;
+
+        if (text) {
+            sf::Vector2f textPos = text->getPosition();
+            if (textPos.x < 300) {
+                textPos.x += _exitAnimationSpeed; // Przesuwaj w prawo
+                if (textPos.x > 300) {
+                    textPos.x = 300; // Zatrzymaj na pozycji docelowej
+                }
+                text->setPosition(textPos);
+            }
+        }
+        sf::FloatRect bounds = button->getGlobalBounds();
+    }
+    if (_titleText->getPosition().x < 0) {
+        _titleText->setPosition(0, 100); // Start poza ekranem
+    }
+
+    sf::Vector2f currentPos = _titleText->getPosition();
+
+    if (currentPos.x < 500) {
+        currentPos.x += _exitAnimationSpeed;
+        if (currentPos.x >= 500) {
+            currentPos.x = 500; 
+            _animationState = AnimationState::NONE;
+        }
+    }
+
+    _titleText->setPosition(currentPos);
+}
+void MenuState::standartAnimation(){
+    sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
+    const float hoverOffset = 10.f;
+    const sf::Color hoverColor(0, 59, 190);
+    for (auto& [button, data] : _buttonData) {
+        auto& [originalBtnPos, originalTxtPos, originalBounds, originalColor] = data;
+        sf::Text* text = nullptr;
+
+        if (button == _createGameButton) text = _createGameButtonText;
+        else if (button == _joinGameButton) text = _joinGameButtonText;
+        else if (button == _settingsButton) text = _settingsButtonText;
+        else if (button == _exitButton) text = _exitButtonText;
+
+        
+        if (originalBounds.contains(mousePos)) {
+            button->setPosition(originalBtnPos.x + hoverOffset, originalBtnPos.y);
+            button->setFillColor(hoverColor);
+            if (text) text->setPosition(originalTxtPos.x + hoverOffset, originalTxtPos.y);
+        } else {
+            button->setPosition(originalBtnPos);
+            button->setFillColor(originalColor);
+            if (text) text->setPosition(originalTxtPos);
+        }
+    }
 }
 
 

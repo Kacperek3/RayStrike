@@ -1,13 +1,13 @@
-#include "SettingsState.h"
+#include "CreateLobbyState.h"
 
-SettingsState::SettingsState(GameDataRef data) : _data(data) {
+CreateLobbyState::CreateLobbyState(GameDataRef data) : _data(data) {
     srand(static_cast<unsigned>(time(NULL)));
 
     _backgroundTexture = new sf::Sprite();
     _titleText = new sf::Text();
 }
 
-void SettingsState::Init(){
+void CreateLobbyState::Init(){
     if (!_font.loadFromFile("assets/fonts/Orbitron/Orbitron-VariableFont_wght.ttf")) {
         std::cout << "Failed to load font" << std::endl;
     }
@@ -16,7 +16,7 @@ void SettingsState::Init(){
     _backgroundTexture->setTexture(_data->assetManager.GetTexture("background"));
 
     _titleText->setFont(_font);
-    _titleText->setString("Settings");
+    _titleText->setString("Create Lobby");
     _titleText->setCharacterSize(50);
     _titleText->setFillColor(sf::Color::White);
 
@@ -25,7 +25,7 @@ void SettingsState::Init(){
    
 }
 
-void SettingsState::HandleInput() {
+void CreateLobbyState::HandleInput() {
     sf::Event event;
     while (_data->window.pollEvent(event)) {
         if (event.type == sf::Event::Closed) {
@@ -42,7 +42,7 @@ void SettingsState::HandleInput() {
     }
 }
 
-void SettingsState::Update() {
+void CreateLobbyState::Update() {
 
     // Animation logic
     if(_animationState == AnimationState::ENTERING) {
@@ -57,7 +57,7 @@ void SettingsState::Update() {
 }
 
 
-void SettingsState::exitingAnimation() {
+void CreateLobbyState::exitingAnimation() {
     
     sf::Vector2f currentPos = _titleText->getPosition();
 
@@ -76,7 +76,7 @@ void SettingsState::exitingAnimation() {
     return;
 }
 
-void SettingsState::enteringAnimation() {
+void CreateLobbyState::enteringAnimation() {
     sf::Vector2f currentPos = _titleText->getPosition();
 
     if (currentPos.x > 0) {
@@ -91,14 +91,14 @@ void SettingsState::enteringAnimation() {
     }
 }
 
-void SettingsState::standartAnimation(){
+void CreateLobbyState::standartAnimation(){
     return;
 }
 
 
 
 
-void SettingsState::Draw() {
+void CreateLobbyState::Draw() {
     _data->window.clear();
     _data->window.draw(*_backgroundTexture);
     _data->window.draw(*_titleText);
@@ -107,14 +107,14 @@ void SettingsState::Draw() {
 }
 
 
-SettingsState::~SettingsState() {
+CreateLobbyState::~CreateLobbyState() {
     delete _backgroundTexture;
     delete _titleText;
     
 }
 
 
-void SettingsState::ClearObjects() {
+void CreateLobbyState::ClearObjects() {
    // _data->assetManager.clearAssets();
     //_data->soundManager.ClearSounds();
 }

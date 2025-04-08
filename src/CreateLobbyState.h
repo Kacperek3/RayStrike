@@ -8,10 +8,10 @@
 
 
 
-class SettingsState : public State {
+class CreateLobbyState : public State {
 public:
-    SettingsState(GameDataRef data);
-    ~SettingsState();
+    CreateLobbyState(GameDataRef data);
+    ~CreateLobbyState();
     void Init() override;
 
     void HandleInput() override;

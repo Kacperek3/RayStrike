@@ -7,6 +7,8 @@
 #include <cmath>
 
 
+
+
 class MenuState : public State {
 public:
     MenuState(GameDataRef data);
@@ -20,6 +22,20 @@ public:
 
 
 private:
+    enum class AnimationState {
+        ENTERING,
+        EXITING,
+        NONE
+    };
+
+    enum class State {
+        NONE,
+        CREATE_GAME,
+        JOIN_GAME,
+        SETTINGS
+    };
+
+
     struct Bullet {
         sf::Sprite sprite;
         sf::Vector2f velocity;
@@ -27,9 +43,15 @@ private:
     };
 
     void ResetBullet(Bullet& bullet, bool initialSpawn = false);
+    void exitingAnimation();
+    void enteringAnimation();
+    void standartAnimation();
+
 
 
     GameDataRef _data;
+    State _state = State::NONE;
+
     sf::Font _font;
     sf::Sprite *_backgroundTexture;
 
@@ -50,8 +72,9 @@ private:
     
     std::unordered_map<sf::RectangleShape*, std::tuple<sf::Vector2f, sf::Vector2f, sf::FloatRect, sf::Color>> _buttonData;
 
-    bool _isExiting = false;
-    bool isComingFromSettings = false;
+
+    AnimationState _animationState = AnimationState::NONE;
+
     const float _exitAnimationSpeed = 50.0f;
 
     
