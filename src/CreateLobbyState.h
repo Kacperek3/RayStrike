@@ -2,6 +2,7 @@
 #include <SFML/Graphics.hpp>
 #include "Game.h"
 #include "State.h"
+#include "TextField.h"
 #include <unordered_map>
 #include <ctime>
 #include <cmath>
@@ -45,6 +46,10 @@ private:
 
     sf::RectangleShape *_backButton;
     sf::Text *_backButtonText;
+
+    TextField *_lobbyNameTextField;
+    sf::Text *_lobbyNameTextFieldHeader;
+    sf::RectangleShape *_lobbyNameTextFieldHeaderBox;
 
     const float _exitAnimationSpeed = 80.0f;
 };

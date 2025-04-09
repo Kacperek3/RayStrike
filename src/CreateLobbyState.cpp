@@ -8,12 +8,27 @@ CreateLobbyState::CreateLobbyState(GameDataRef data) : _data(data) {
 
     _backButton = new sf::RectangleShape();
     _backButtonText = new sf::Text();
+
+    _lobbyNameTextField = nullptr;
+    _lobbyNameTextFieldHeader = new sf::Text();
+    _lobbyNameTextFieldHeaderBox = new sf::RectangleShape();
+
 }
 
 void CreateLobbyState::Init(){
     if (!_font.loadFromFile("assets/fonts/Orbitron/Orbitron-VariableFont_wght.ttf")) {
         std::cout << "Failed to load font" << std::endl;
     }
+    _lobbyNameTextField = new TextField(450, 300, 400, 50, _font);
+    _lobbyNameTextFieldHeader->setFont(_font);
+    _lobbyNameTextFieldHeader->setString("LOBBY NAME");
+    _lobbyNameTextFieldHeader->setCharacterSize(15);
+    _lobbyNameTextFieldHeader->setFillColor(sf::Color::White);
+    _lobbyNameTextFieldHeader->setPosition(456, 271);
+    _lobbyNameTextFieldHeaderBox->setSize(sf::Vector2f(140, 60));
+    _lobbyNameTextFieldHeaderBox->setFillColor(sf::Color(80, 150, 255,150));
+    _lobbyNameTextFieldHeaderBox->setPosition(448, 266);
+
 
     _data->assetManager.LoadTexture("background", "assets/background.jpg");
     _backgroundTexture->setTexture(_data->assetManager.GetTexture("background"));
@@ -54,6 +69,7 @@ void CreateLobbyState::HandleInput() {
             _data->window.close();
             return;
         }
+        _lobbyNameTextField->handleEvent(event);
         if(event.type == sf::Event::MouseButtonPressed ) {
             if (event.mouseButton.button == sf::Mouse::Left) {
                 sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
@@ -195,6 +211,10 @@ void CreateLobbyState::Draw() {
     _data->window.draw(*_backgroundTexture);
     _data->window.draw(*_titleText);
 
+    _data->window.draw(*_lobbyNameTextFieldHeaderBox);
+    _lobbyNameTextField->draw(_data->window);
+    _data->window.draw(*_lobbyNameTextFieldHeader);
+
     _data->window.draw(*_backButton);
     _data->window.draw(*_backButtonText);
 
@@ -207,7 +227,9 @@ CreateLobbyState::~CreateLobbyState() {
     delete _titleText;
     delete _backButton;
     delete _backButtonText;
-    
+    delete _lobbyNameTextField;
+    delete _lobbyNameTextFieldHeader;
+    delete _lobbyNameTextFieldHeaderBox;
 }
 
 
