@@ -1,11 +1,15 @@
 #pragma once
 #include <SFML/Graphics.hpp>
-#include "Game.h"
-#include "State.h"
-#include "TextField.h"
+
 #include <unordered_map>
 #include <ctime>
 #include <cmath>
+
+#include "Game.h"
+#include "State.h"
+#include "TextField.h"
+#include "LabeledTextField.h"
+
 
 
 
@@ -47,9 +51,9 @@ private:
     sf::RectangleShape *_backButton;
     sf::Text *_backButtonText;
 
-    TextField *_lobbyNameTextField;
-    sf::Text *_lobbyNameTextFieldHeader;
-    sf::RectangleShape *_lobbyNameTextFieldHeaderBox;
+    
+    LabeledTextField *_lobbyNameTextField;
+    LabeledTextField *_lobbyPlayerNameTextField;
 
     const float _exitAnimationSpeed = 80.0f;
 };

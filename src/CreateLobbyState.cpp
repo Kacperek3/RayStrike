@@ -10,8 +10,8 @@ CreateLobbyState::CreateLobbyState(GameDataRef data) : _data(data) {
     _backButtonText = new sf::Text();
 
     _lobbyNameTextField = nullptr;
-    _lobbyNameTextFieldHeader = new sf::Text();
-    _lobbyNameTextFieldHeaderBox = new sf::RectangleShape();
+    //_lobbyNameTextFieldHeader = new sf::Text();
+    //_lobbyNameTextFieldHeaderBox = new sf::RectangleShape();
 
 }
 
@@ -19,16 +19,10 @@ void CreateLobbyState::Init(){
     if (!_font.loadFromFile("assets/fonts/Orbitron/Orbitron-VariableFont_wght.ttf")) {
         std::cout << "Failed to load font" << std::endl;
     }
-    _lobbyNameTextField = new TextField(450, 300, 400, 50, _font);
-    _lobbyNameTextFieldHeader->setFont(_font);
-    _lobbyNameTextFieldHeader->setString("LOBBY NAME");
-    _lobbyNameTextFieldHeader->setCharacterSize(15);
-    _lobbyNameTextFieldHeader->setFillColor(sf::Color::White);
-    _lobbyNameTextFieldHeader->setPosition(456, 271);
-    _lobbyNameTextFieldHeaderBox->setSize(sf::Vector2f(140, 27));
-    _lobbyNameTextFieldHeaderBox->setFillColor(sf::Color(80, 150, 255,150));
-    _lobbyNameTextFieldHeaderBox->setPosition(448, 266);
 
+
+    _lobbyNameTextField = new LabeledTextField(900, 280, 400, 50, 140, "LOBBY NAME", _font);
+    _lobbyPlayerNameTextField = new LabeledTextField(900, 400, 400, 50, 160, "PLAYER NAME", _font);
 
     _data->assetManager.LoadTexture("background", "assets/background.jpg");
     _backgroundTexture->setTexture(_data->assetManager.GetTexture("background"));
@@ -41,11 +35,13 @@ void CreateLobbyState::Init(){
 
     _backButton->setSize(sf::Vector2f(250, 50));
     _backButton->setFillColor(sf::Color(80, 150, 255,150));
+    _backButton->setPosition(sf::Vector2f(300, 700));
 
     _backButtonText->setFont(_font);
     _backButtonText->setString("Back");
     _backButtonText->setCharacterSize(30);
     _backButtonText->setFillColor(sf::Color::White);
+
 
  
 
@@ -70,6 +66,7 @@ void CreateLobbyState::HandleInput() {
             return;
         }
         _lobbyNameTextField->handleEvent(event);
+        _lobbyPlayerNameTextField->handleEvent(event);
         if(event.type == sf::Event::MouseButtonPressed ) {
             if (event.mouseButton.button == sf::Mouse::Left) {
                 sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
@@ -123,27 +120,8 @@ void CreateLobbyState::exitingAnimation() {
         }
     }
 
-
-    // moving textField
-    sf::Vector2f textFieldPos = _lobbyNameTextField->getPosition();
-    textFieldPos.x += _exitAnimationSpeed;
-    _lobbyNameTextField->setPosition(textFieldPos);
-
-    // moving textField header
-    sf::Vector2f textFieldHeaderPos = _lobbyNameTextFieldHeader->getPosition();
-    textFieldHeaderPos.x += _exitAnimationSpeed;
-    _lobbyNameTextFieldHeader->setPosition(textFieldHeaderPos);
-    // moving textField header box
-    sf::Vector2f textFieldHeaderBoxPos = _lobbyNameTextFieldHeaderBox->getPosition();
-    textFieldHeaderBoxPos.x += _exitAnimationSpeed;
-    _lobbyNameTextFieldHeaderBox->setPosition(textFieldHeaderBoxPos);
-
-
-
-
-
-
-
+    _lobbyNameTextField->move(sf::Vector2f(_exitAnimationSpeed, 0));
+    _lobbyPlayerNameTextField->move(sf::Vector2f(_exitAnimationSpeed, 0));
 
     sf::Vector2f currentPos = _titleText->getPosition();
 
@@ -189,6 +167,11 @@ void CreateLobbyState::enteringAnimation() {
         }
     }
 
+
+    
+    _lobbyNameTextField->move(sf::Vector2f(-_exitAnimationSpeed, 0));
+    _lobbyPlayerNameTextField->move(sf::Vector2f(-_exitAnimationSpeed, 0));
+
     sf::Vector2f currentPos = _titleText->getPosition();
 
     if (currentPos.x > 0) {
@@ -213,8 +196,6 @@ void CreateLobbyState::standartAnimation(){
 
         if (button == _backButton) text = _backButtonText;
         
-
-        
         if (originalBounds.contains(mousePos)) {
             button->setPosition(originalBtnPos.x, originalBtnPos.y);
             button->setFillColor(hoverColor);
@@ -235,9 +216,8 @@ void CreateLobbyState::Draw() {
     _data->window.draw(*_backgroundTexture);
     _data->window.draw(*_titleText);
 
-    _data->window.draw(*_lobbyNameTextFieldHeaderBox);
     _lobbyNameTextField->draw(_data->window);
-    _data->window.draw(*_lobbyNameTextFieldHeader);
+    _lobbyPlayerNameTextField->draw(_data->window);
 
     _data->window.draw(*_backButton);
     _data->window.draw(*_backButtonText);
@@ -252,8 +232,8 @@ CreateLobbyState::~CreateLobbyState() {
     delete _backButton;
     delete _backButtonText;
     delete _lobbyNameTextField;
-    delete _lobbyNameTextFieldHeader;
-    delete _lobbyNameTextFieldHeaderBox;
+    delete _lobbyPlayerNameTextField;
+    
 }
 
 
