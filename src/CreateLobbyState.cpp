@@ -98,8 +98,6 @@ void CreateLobbyState::HandleInput() {
 }
 
 void CreateLobbyState::Update() {
-    std::cout << _createLobbyButtonText->getPosition().x << " " << _createLobbyButtonText->getPosition().y<< std::endl;
-    std::cout << _backButtonText->getPosition().x << std::endl;
     // Animation logic
     if(_animationState == AnimationState::ENTERING) {
         enteringAnimation();
@@ -128,6 +126,7 @@ void CreateLobbyState::exitingAnimation() {
 
         sf::Text* text = nullptr;
         if (button == _backButton) text = _backButtonText;
+        else if (button == _createLobbyButton) text = _createLobbyButtonText;
         
         if (text) {
             sf::Vector2f textPos = text->getPosition();
