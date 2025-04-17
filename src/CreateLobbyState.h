@@ -9,7 +9,7 @@
 #include "State.h"
 #include "TextField.h"
 #include "LabeledTextField.h"
-
+#include "Tesseract.h"
 
 
 
@@ -51,9 +51,14 @@ private:
     sf::RectangleShape *_backButton;
     sf::Text *_backButtonText;
 
+    sf::RectangleShape *_createLobbyButton;
+    sf::Text *_createLobbyButtonText;
+
     
     LabeledTextField *_lobbyNameTextField;
     LabeledTextField *_lobbyPlayerNameTextField;
+
+    Tesseract *_tesseract;
 
     const float _exitAnimationSpeed = 80.0f;
 };

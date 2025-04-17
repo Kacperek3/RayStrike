@@ -8,11 +8,12 @@ CreateLobbyState::CreateLobbyState(GameDataRef data) : _data(data) {
 
     _backButton = new sf::RectangleShape();
     _backButtonText = new sf::Text();
+    _createLobbyButton = new sf::RectangleShape();
+    _createLobbyButtonText = new sf::Text();
 
     _lobbyNameTextField = nullptr;
-    //_lobbyNameTextFieldHeader = new sf::Text();
-    //_lobbyNameTextFieldHeaderBox = new sf::RectangleShape();
 
+    _tesseract = new Tesseract();
 }
 
 void CreateLobbyState::Init(){
@@ -21,8 +22,8 @@ void CreateLobbyState::Init(){
     }
 
 
-    _lobbyNameTextField = new LabeledTextField(900, 280, 400, 50, 140, "LOBBY NAME", _font);
-    _lobbyPlayerNameTextField = new LabeledTextField(900, 400, 400, 50, 160, "PLAYER NAME", _font);
+    _lobbyNameTextField = new LabeledTextField(760, 280, 400, 50, 140, "LOBBY NAME", _font);
+    _lobbyPlayerNameTextField = new LabeledTextField(760, 400, 400, 50, 160, "PLAYER NAME", _font);
 
     _data->assetManager.LoadTexture("background", "assets/background.jpg");
     _backgroundTexture->setTexture(_data->assetManager.GetTexture("background"));
@@ -41,21 +42,38 @@ void CreateLobbyState::Init(){
     _backButtonText->setString("Back");
     _backButtonText->setCharacterSize(30);
     _backButtonText->setFillColor(sf::Color::White);
+    _backButtonText->setPosition(_backButton->getPosition().x + 70, _backButton->getPosition().y + 8);
+
+    _createLobbyButton->setSize(sf::Vector2f(280, 50));
+    _createLobbyButton->setFillColor(sf::Color(80, 150, 255,150));
+    _createLobbyButton->setPosition(sf::Vector2f(750, 700));
+
+    _createLobbyButtonText->setFont(_font);
+    _createLobbyButtonText->setString("Create Lobby");
+    _createLobbyButtonText->setCharacterSize(30);
+    _createLobbyButtonText->setFillColor(sf::Color::White);
+    _createLobbyButtonText->setPosition(_createLobbyButton->getPosition().x + 40, _createLobbyButton->getPosition().y + 8);
 
 
+    _tesseract->setPosition(sf::Vector2f(620, 400));
+    _tesseract->setScale(3.0f);
  
 
     auto storeButtonData = [&](sf::RectangleShape* btn, sf::Text* txt) {
-        sf::Vector2f originalBtnPos = sf::Vector2f(300, 700);
-        sf::Vector2f originalTxtPos = sf::Vector2f(370, 708);
+        sf::Vector2f originalBtnPos = btn->getPosition();
+        sf::Vector2f originalTxtPos = txt->getPosition();
         sf::FloatRect originalBounds = btn->getGlobalBounds();
         sf::Color originalColor = btn->getFillColor();
         _buttonData[btn] = {originalBtnPos, originalTxtPos, originalBounds, originalColor};
     };
     storeButtonData(_backButton, _backButtonText);  
+    storeButtonData(_createLobbyButton, _createLobbyButtonText);
 
     _backButton->setPosition(1100, 700);
     _backButtonText->setPosition(1170, 708);
+
+    _createLobbyButton->setPosition(1100, 700);
+    _createLobbyButtonText->setPosition(1100, 708);
 }
 
 void CreateLobbyState::HandleInput() {
@@ -80,7 +98,8 @@ void CreateLobbyState::HandleInput() {
 }
 
 void CreateLobbyState::Update() {
-
+    std::cout << _createLobbyButtonText->getPosition().x << " " << _createLobbyButtonText->getPosition().y<< std::endl;
+    std::cout << _backButtonText->getPosition().x << std::endl;
     // Animation logic
     if(_animationState == AnimationState::ENTERING) {
         enteringAnimation();
@@ -90,7 +109,7 @@ void CreateLobbyState::Update() {
         standartAnimation();
     }
 
-    
+    _tesseract->update();
 }
 
 
@@ -154,6 +173,7 @@ void CreateLobbyState::enteringAnimation() {
 
         sf::Text* text = nullptr;
         if (button == _backButton) text = _backButtonText;
+        else if (button == _createLobbyButton) text = _createLobbyButtonText;
         
         if (text) {
             sf::Vector2f textPos = text->getPosition();
@@ -214,6 +234,7 @@ void CreateLobbyState::standartAnimation(){
 void CreateLobbyState::Draw() {
     _data->window.clear();
     _data->window.draw(*_backgroundTexture);
+    
     _data->window.draw(*_titleText);
 
     _lobbyNameTextField->draw(_data->window);
@@ -221,16 +242,22 @@ void CreateLobbyState::Draw() {
 
     _data->window.draw(*_backButton);
     _data->window.draw(*_backButtonText);
+    _data->window.draw(*_createLobbyButton);
+    _data->window.draw(*_createLobbyButtonText);
 
+    _tesseract->draw(_data->window);
     _data->window.display();
 }
 
 
 CreateLobbyState::~CreateLobbyState() {
     delete _backgroundTexture;
+    delete _tesseract;
     delete _titleText;
     delete _backButton;
     delete _backButtonText;
+    delete _createLobbyButton;
+    delete _createLobbyButtonText;
     delete _lobbyNameTextField;
     delete _lobbyPlayerNameTextField;
     
