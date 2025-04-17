@@ -2,6 +2,7 @@
 
 #include <SFML/Graphics.hpp>
 #include "TextField.h"
+#include <string>
 
 class LabeledTextField {
 public:
@@ -14,6 +15,10 @@ public:
 
     void handleEvent(const sf::Event& event);
     void draw(sf::RenderWindow& window);
+
+    std::string getText() {
+        return _textField->getInput();
+    }
 
 private:
     TextField *_textField;

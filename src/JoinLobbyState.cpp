@@ -22,6 +22,15 @@ void JoinLobbyState::Init(){
 
 
     _titleText->setPosition(_data->window.getSize().x,100);
+
+
+    _udpSocket.setBlocking(false);
+    if (_udpSocket.bind(_broadcastPort) != sf::Socket::Done) {
+        std::cout << "Failed to bind UDP socket!" << std::endl;
+    }
+
+    _receiveClock = new sf::Clock();
+    _receiveClock->restart();
    
 }
 
@@ -53,6 +62,41 @@ void JoinLobbyState::Update() {
         standartAnimation();
     }
 
+
+
+    char buffer[128];
+    std::size_t received = 0;
+    sf::IpAddress sender;
+    unsigned short port;
+
+    if (_udpSocket.receive(buffer, sizeof(buffer), received, sender, port) == sf::Socket::Done) {
+        std::string msg(buffer, received);
+        if (msg.find("LOBBY|") == 0) {
+            auto parts = msg.substr(6); // usuń "LOBBY|"
+            auto delimPos = parts.find('|');
+            if (delimPos != std::string::npos) {
+                std::string lobbyName = parts.substr(0, delimPos);
+                std::string hostPlayer = parts.substr(delimPos + 1);
+
+                _lobbies[lobbyName] = LobbyInfo{lobbyName, hostPlayer, sender, _receiveClock->getElapsedTime()};
+            }
+        }
+    }
+
+    // Czyść nieaktywne lobby po 5 sek
+    for (auto it = _lobbies.begin(); it != _lobbies.end();) {
+        if (_receiveClock->getElapsedTime() - it->second.lastSeen > sf::seconds(5)) {
+            it = _lobbies.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+
+    int i = 0;
+    for (const auto& [key, lobby] : _lobbies) {
+        std::string text = "Lobby: " + lobby.name + " | Host: " + lobby.hostPlayer;
+    }
     
 }
 
@@ -110,6 +154,7 @@ void JoinLobbyState::Draw() {
 JoinLobbyState::~JoinLobbyState() {
     delete _backgroundTexture;
     delete _titleText;
+    delete _receiveClock;
     
 }
 

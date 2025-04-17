@@ -10,4 +10,4 @@ file(GLOB SOURCES src/*.cpp)
 add_executable(RayStrike ${SOURCES})
 file(COPY assets DESTINATION ${CMAKE_BINARY_DIR})
 
-target_link_libraries(RayStrike PRIVATE sfml-graphics sfml-window sfml-system sfml-audio)
+target_link_libraries(RayStrike PRIVATE sfml-graphics sfml-window sfml-system sfml-audio sfml-network)

@@ -1,4 +1,5 @@
 #include "CreateLobbyState.h"
+#include "LobbyWaitingState.h"
 
 CreateLobbyState::CreateLobbyState(GameDataRef data) : _data(data) {
     srand(static_cast<unsigned>(time(NULL)));
@@ -90,6 +91,16 @@ void CreateLobbyState::HandleInput() {
                 sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
                 if (_backButton->getGlobalBounds().contains(mousePos)) {
                     _animationState = AnimationState::EXITING;
+                }
+                else if( _createLobbyButton->getGlobalBounds().contains(mousePos)) {
+                    std::string lobbyName = _lobbyNameTextField->getText();
+                    std::string playerName = _lobbyPlayerNameTextField->getText();
+
+                    if (lobbyName.empty() || playerName.empty()) {
+                        std::cout << "Please fill in all fields." << std::endl;
+                    } else {
+                        _data->stateManager.AddState(StateRef(new LobbyWaitingState(_data, lobbyName, playerName)), false);
+                    }
                 }
             }
             return;
