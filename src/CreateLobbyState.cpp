@@ -25,7 +25,7 @@ void CreateLobbyState::Init(){
     _lobbyNameTextFieldHeader->setCharacterSize(15);
     _lobbyNameTextFieldHeader->setFillColor(sf::Color::White);
     _lobbyNameTextFieldHeader->setPosition(456, 271);
-    _lobbyNameTextFieldHeaderBox->setSize(sf::Vector2f(140, 60));
+    _lobbyNameTextFieldHeaderBox->setSize(sf::Vector2f(140, 27));
     _lobbyNameTextFieldHeaderBox->setFillColor(sf::Color(80, 150, 255,150));
     _lobbyNameTextFieldHeaderBox->setPosition(448, 266);
 
@@ -41,13 +41,13 @@ void CreateLobbyState::Init(){
 
     _backButton->setSize(sf::Vector2f(250, 50));
     _backButton->setFillColor(sf::Color(80, 150, 255,150));
-    _backButton->setPosition(300, 700);
 
     _backButtonText->setFont(_font);
     _backButtonText->setString("Back");
     _backButtonText->setCharacterSize(30);
     _backButtonText->setFillColor(sf::Color::White);
-    _backButtonText->setPosition(370, 708);
+
+ 
 
     auto storeButtonData = [&](sf::RectangleShape* btn, sf::Text* txt) {
         sf::Vector2f originalBtnPos = sf::Vector2f(300, 700);
@@ -123,6 +123,28 @@ void CreateLobbyState::exitingAnimation() {
         }
     }
 
+
+    // moving textField
+    sf::Vector2f textFieldPos = _lobbyNameTextField->getPosition();
+    textFieldPos.x += _exitAnimationSpeed;
+    _lobbyNameTextField->setPosition(textFieldPos);
+
+    // moving textField header
+    sf::Vector2f textFieldHeaderPos = _lobbyNameTextFieldHeader->getPosition();
+    textFieldHeaderPos.x += _exitAnimationSpeed;
+    _lobbyNameTextFieldHeader->setPosition(textFieldHeaderPos);
+    // moving textField header box
+    sf::Vector2f textFieldHeaderBoxPos = _lobbyNameTextFieldHeaderBox->getPosition();
+    textFieldHeaderBoxPos.x += _exitAnimationSpeed;
+    _lobbyNameTextFieldHeaderBox->setPosition(textFieldHeaderBoxPos);
+
+
+
+
+
+
+
+
     sf::Vector2f currentPos = _titleText->getPosition();
 
     if (currentPos.x < _data->window.getSize().x) {
@@ -140,6 +162,8 @@ void CreateLobbyState::exitingAnimation() {
 
 void CreateLobbyState::enteringAnimation() {
     bool allButtonsOffScreen = true;
+    bool allTextFieldsOffScreen = true;
+
 
     for (auto& [button, data] : _buttonData) {
         auto& [originalBtnPos, originalTxtPos, originalBounds, originalColor] = data;
@@ -169,8 +193,8 @@ void CreateLobbyState::enteringAnimation() {
 
     if (currentPos.x > 0) {
         currentPos.x -= _exitAnimationSpeed;
-        if (currentPos.x <= 500){
-            currentPos.x = 500;
+        if (currentPos.x <= 450){
+            currentPos.x = 450;
             _animationState = AnimationState::NONE;
         }
         
@@ -192,9 +216,9 @@ void CreateLobbyState::standartAnimation(){
 
         
         if (originalBounds.contains(mousePos)) {
-            button->setPosition(originalBtnPos.x + hoverOffset, originalBtnPos.y);
+            button->setPosition(originalBtnPos.x, originalBtnPos.y);
             button->setFillColor(hoverColor);
-            if (text) text->setPosition(originalTxtPos.x + hoverOffset, originalTxtPos.y);
+            if (text) text->setPosition(originalTxtPos.x, originalTxtPos.y);
         } else {
             button->setPosition(originalBtnPos);
             button->setFillColor(originalColor);

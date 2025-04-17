@@ -8,6 +8,10 @@ public:
     void handleEvent(const sf::Event& event);
     void draw(sf::RenderWindow& window);
     std::string getInput() const;
+    void setPosition(float x, float y);
+    void setPosition(sf::Vector2f pos) { setPosition(pos.x, pos.y); }
+    sf::FloatRect getGlobalBounds() const;
+    sf::Vector2f getPosition() const;
 
 private:
     sf::RectangleShape box;
