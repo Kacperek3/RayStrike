@@ -11,14 +11,7 @@
 #include "TextField.h"
 #include "LabeledTextField.h"
 #include "Tesseract.h"
-
-
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <cstring>
-
+#include "NetworkManager.h"
 
 class LobbyWaitingState : public State {
 public:
@@ -68,14 +61,9 @@ private:
     Tesseract *_tesseract;
 
 
+    NetworkManager _networkManager;
 
 
-    int udpSocket;
-    int tcpSocket;
-    sockaddr_in broadcastAddr;
-    sockaddr_in tcpAddr;
-    std::string broadcastMessage;
-    int tcpPort;
-    sf::Clock broadcastClock;
+   
 
 };
