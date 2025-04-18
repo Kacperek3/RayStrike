@@ -36,7 +36,7 @@ void MenuState::Init(){
     _data->menuSoundtrack.setBuffer(_data->soundManager.GetSoundBuffer("soundtrack"));
     _data->menuSoundtrack.setLoop(true);
     _data->menuSoundtrack.setVolume(20);
-    _data->menuSoundtrack.play();
+    //_data->menuSoundtrack.play();
 
     _titleText->setFont(_font);
     _titleText->setString("RayStrike");

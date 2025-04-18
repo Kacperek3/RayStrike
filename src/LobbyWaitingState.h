@@ -47,10 +47,18 @@ private:
     sf::Font _font;
     sf::Sprite *_backgroundTexture;
     sf::Text *_titleText;
+    sf::Text *_centralWaitingText;
+
 
     const float _exitAnimationSpeed = 60.0f;
 
     sf::RectangleShape *_backButton;
     sf::Text *_backButtonText;
+
+    sf::Clock *_dotClock;
+    std::string _baseText = "Waiting for player...          ";
+    int _charIndex = 0; 
+
+    Tesseract *_tesseract;
 
 };
