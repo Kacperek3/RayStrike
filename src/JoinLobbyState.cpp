@@ -96,6 +96,7 @@ void JoinLobbyState::Update() {
     int i = 0;
     for (const auto& [key, lobby] : _lobbies) {
         std::string text = "Lobby: " + lobby.name + " | Host: " + lobby.hostPlayer;
+        std::cout << text << std::endl;
     }
     
 }

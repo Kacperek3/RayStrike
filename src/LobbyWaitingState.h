@@ -1,7 +1,10 @@
 #pragma once
 #include <SFML/Graphics.hpp>
-#include <SFML/Network.hpp>
 #include <SFML/Window.hpp>
+
+#include <unordered_map>
+#include <ctime>
+#include <cmath>
 
 #include "Game.h"
 #include "State.h"
@@ -35,28 +38,19 @@ private:
     void standartAnimation();
 
     AnimationState _animationState = AnimationState::ENTERING;
+    std::unordered_map<sf::RectangleShape*, std::tuple<sf::Vector2f, sf::Vector2f, sf::FloatRect, sf::Color>> _buttonData;
 
     GameDataRef _data;
     std::string _lobbyName;
     std::string _playerName;
-    sf::Text _waitingText;
 
     sf::Font _font;
     sf::Sprite *_backgroundTexture;
     sf::Text *_titleText;
 
-    const float _exitAnimationSpeed = 80.0f;
+    const float _exitAnimationSpeed = 60.0f;
 
-    // Networking (host)
-    sf::TcpListener _listener;
-    sf::TcpSocket _client;
+    sf::RectangleShape *_backButton;
+    sf::Text *_backButtonText;
 
-    sf::UdpSocket _udpSocket;
-    sf::Clock *_broadcastClock;
-
-    unsigned short _broadcastPort = 54001;
-    unsigned short _listenPort = 54000;
-
-
-    bool _connected = false;
 };

@@ -100,6 +100,7 @@ void CreateLobbyState::HandleInput() {
                         std::cout << "Please fill in all fields." << std::endl;
                     } else {
                         _data->stateManager.AddState(StateRef(new LobbyWaitingState(_data, lobbyName, playerName)), false);
+                        
                     }
                 }
             }
@@ -244,7 +245,7 @@ void CreateLobbyState::standartAnimation(){
 void CreateLobbyState::Draw() {
     _data->window.clear();
     _data->window.draw(*_backgroundTexture);
-    
+    _tesseract->draw(_data->window);
     _data->window.draw(*_titleText);
 
     _lobbyNameTextField->draw(_data->window);
@@ -255,7 +256,7 @@ void CreateLobbyState::Draw() {
     _data->window.draw(*_createLobbyButton);
     _data->window.draw(*_createLobbyButtonText);
 
-    _tesseract->draw(_data->window);
+    
     _data->window.display();
 }
 

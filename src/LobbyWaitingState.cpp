@@ -2,7 +2,9 @@
 
 LobbyWaitingState::LobbyWaitingState(GameDataRef data, std::string lobbyName, std::string playerName)
     : _data(data), _lobbyName(lobbyName), _playerName(playerName) {
-    srand(static_cast<unsigned>(time(NULL)));
+    
+    _backButton = new sf::RectangleShape();
+    _backButtonText = new sf::Text();
 
     _backgroundTexture = new sf::Sprite();
     _titleText = new sf::Text();
@@ -20,25 +22,33 @@ void LobbyWaitingState::Init() {
     _titleText->setString("Waiting for players...");
     _titleText->setCharacterSize(50);
     _titleText->setFillColor(sf::Color::White);
-    _titleText->setPosition(500, 100);
-
-    _waitingText.setFont(_font);
-    _waitingText.setString("Waiting for players...");
-    _waitingText.setCharacterSize(30);
-    _waitingText.setFillColor(sf::Color::White);
-    _waitingText.setPosition(500, 300);
+    _titleText->setPosition(_data->window.getSize().x, 100);
+    
 
 
-    _udpSocket.setBlocking(false);
-    _udpSocket.bind(sf::Socket::AnyPort);
+    //buttons
+    _backButton->setSize(sf::Vector2f(250, 50));
+    _backButton->setFillColor(sf::Color(80, 150, 255,150));
+    _backButton->setPosition(sf::Vector2f(515, 700));
 
-    if (_listener.listen(_listenPort) != sf::Socket::Done) {
-        std::cout << "TCP Listener failed!" << std::endl;
-    }
-    _listener.setBlocking(false); 
+    _backButtonText->setFont(_font);
+    _backButtonText->setString("Back");
+    _backButtonText->setCharacterSize(30);
+    _backButtonText->setFillColor(sf::Color::White);
+    _backButtonText->setPosition(_backButton->getPosition().x + 70, _backButton->getPosition().y + 8);
 
-    _broadcastClock = new sf::Clock();
-    _broadcastClock->restart();
+    auto storeButtonData = [&](sf::RectangleShape* btn, sf::Text* txt) {
+        sf::Vector2f originalBtnPos = btn->getPosition();
+        sf::Vector2f originalTxtPos = txt->getPosition();
+        sf::FloatRect originalBounds = btn->getGlobalBounds();
+        sf::Color originalColor = btn->getFillColor();
+        _buttonData[btn] = {originalBtnPos, originalTxtPos, originalBounds, originalColor};
+    };
+    storeButtonData(_backButton, _backButtonText);  
+
+    _backButton->setPosition(1100, 700);
+    _backButtonText->setPosition(1170, 708);
+    
 }
 
 void LobbyWaitingState::HandleInput() {
@@ -51,7 +61,10 @@ void LobbyWaitingState::HandleInput() {
         if (event.type == sf::Event::MouseButtonPressed) {
             if (event.mouseButton.button == sf::Mouse::Left) {
                 sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
-                _animationState = AnimationState::EXITING;
+                if (_backButton->getGlobalBounds().contains(mousePos)) {
+                    _animationState = AnimationState::EXITING;
+                    _data->stateManager.RemoveState();
+                }
             }
             return;
         }
@@ -59,31 +72,87 @@ void LobbyWaitingState::HandleInput() {
 }
 
 void LobbyWaitingState::Update() {
-    // if (_animationState == AnimationState::ENTERING) {
-    //     enteringAnimation();
-    // } else if (_animationState == AnimationState::EXITING) {
-    //     exitingAnimation();
-    // } else {
-    //     standartAnimation();
-    // }
+    if (_animationState == AnimationState::ENTERING) {
+        enteringAnimation();
+    } else if (_animationState == AnimationState::EXITING) {
+        exitingAnimation();
+    } else {
+        standartAnimation();
+    }
+    
+}
 
-    // CO 1 SEKUNDĘ WYŚLIJ BROADCAST
-    if (_broadcastClock->getElapsedTime().asSeconds() >= 1.0f) {
-        std::string message = "LOBBY|" + _lobbyName + "|" + _playerName;
-        if (_udpSocket.send(message.c_str(), message.size(), sf::IpAddress::Broadcast, _broadcastPort) != sf::Socket::Done) {
-            std::cout << "Failed to send UDP broadcast\n";
+
+
+void LobbyWaitingState::exitingAnimation() {
+    
+    
+    
+    return;
+}
+
+void LobbyWaitingState::enteringAnimation() {
+    bool allButtonsOffScreen = true;
+    bool allTextFieldsOffScreen = true;
+
+    std::cout << "Entering animation" << std::endl;
+    for (auto& [button, data] : _buttonData) {
+        auto& [originalBtnPos, originalTxtPos, originalBounds, originalColor] = data;
+        
+        sf::Vector2f newPos = button->getPosition();
+        newPos.x -= _exitAnimationSpeed;
+        button->setPosition(newPos);
+        _titleText->setPosition(_titleText->getPosition().x - _exitAnimationSpeed, _titleText->getPosition().y);
+
+
+        sf::Text* text = nullptr;
+        if (button == _backButton) text = _backButtonText;
+        
+        if (text) {
+            sf::Vector2f textPos = text->getPosition();
+            textPos.x -= _exitAnimationSpeed;
+            text->setPosition(textPos);
         }
-        _broadcastClock->restart();
+
+        sf::FloatRect bounds = button->getGlobalBounds();
+        if (bounds.left + bounds.width > 0) {
+            allButtonsOffScreen = false;
+        }
     }
 
-    // SPRAWDŹ, CZY KLIENT SIĘ POŁĄCZYŁ
-    if (!_connected) {
-        if (_listener.accept(_client) == sf::Socket::Done) {
-            _connected = true;
-            std::cout << "Gracz dołączył z IP: " << _client.getRemoteAddress() << std::endl;
-            _client.setBlocking(false);
 
-          
+    sf::Vector2f currentPos = _titleText->getPosition();
+
+    if (currentPos.x > 0) {
+        currentPos.x -= _exitAnimationSpeed;
+        if (currentPos.x <= 450){
+            currentPos.x = 450;
+            _animationState = AnimationState::NONE;
+        }
+        
+        _titleText->setPosition(currentPos);
+
+    }
+}
+
+void LobbyWaitingState::standartAnimation(){
+    sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
+    const float hoverOffset = 10.f;
+    const sf::Color hoverColor(0, 59, 190);
+    for (auto& [button, data] : _buttonData) {
+        auto& [originalBtnPos, originalTxtPos, originalBounds, originalColor] = data;
+        sf::Text* text = nullptr;
+
+        if (button == _backButton) text = _backButtonText;
+        
+        if (originalBounds.contains(mousePos)) {
+            button->setPosition(originalBtnPos.x, originalBtnPos.y);
+            button->setFillColor(hoverColor);
+            if (text) text->setPosition(originalTxtPos.x, originalTxtPos.y);
+        } else {
+            button->setPosition(originalBtnPos);
+            button->setFillColor(originalColor);
+            if (text) text->setPosition(originalTxtPos);
         }
     }
 }
@@ -93,7 +162,8 @@ void LobbyWaitingState::Draw() {
     _data->window.clear();
     _data->window.draw(*_backgroundTexture);
     _data->window.draw(*_titleText);
-    _data->window.draw(_waitingText);
+    _data->window.draw(*_backButton);
+    _data->window.draw(*_backButtonText);
     _data->window.display();
 }
 
@@ -101,6 +171,7 @@ void LobbyWaitingState::Draw() {
 LobbyWaitingState::~LobbyWaitingState() {
     delete _backgroundTexture;
     delete _titleText;
-    delete _broadcastClock;
+    delete _backButton;
+    delete _backButtonText;
 }
 
