@@ -13,6 +13,12 @@
 #include "Tesseract.h"
 
 
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <cstring>
+
 
 class LobbyWaitingState : public State {
 public:
@@ -60,5 +66,16 @@ private:
     int _charIndex = 0; 
 
     Tesseract *_tesseract;
+
+
+
+
+    int udpSocket;
+    int tcpSocket;
+    sockaddr_in broadcastAddr;
+    sockaddr_in tcpAddr;
+    std::string broadcastMessage;
+    int tcpPort;
+    sf::Clock broadcastClock;
 
 };

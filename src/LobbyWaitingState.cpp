@@ -61,6 +61,41 @@ void LobbyWaitingState::Init() {
     _backButton->setPosition(1100, 700);
     _backButtonText->setPosition(1170, 708);
     
+
+
+
+    // network
+    udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
+    int broadcastEnable = 1;
+    setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
+
+    memset(&broadcastAddr, 0, sizeof(broadcastAddr));
+    broadcastAddr.sin_family = AF_INET;
+    broadcastAddr.sin_port = htons(8888);
+    broadcastAddr.sin_addr.s_addr = inet_addr("255.255.255.255");
+
+    // Inicjalizacja TCP
+    tcpSocket = socket(AF_INET, SOCK_STREAM, 0);
+    memset(&tcpAddr, 0, sizeof(tcpAddr));
+    tcpAddr.sin_family = AF_INET;
+    tcpAddr.sin_addr.s_addr = INADDR_ANY;
+    tcpAddr.sin_port = htons(0); // Losowy port
+
+    if (bind(tcpSocket, (sockaddr*)&tcpAddr, sizeof(tcpAddr)) < 0) {
+        std::cerr << "Błąd bindowania TCP\n";
+        return;
+    }
+
+    // Pobierz przypisany port
+    socklen_t len = sizeof(tcpAddr);
+    getsockname(tcpSocket, (sockaddr*)&tcpAddr, &len);
+    tcpPort = ntohs(tcpAddr.sin_port);
+
+    listen(tcpSocket, SOMAXCONN);
+
+    // Przygotuj wiadomość broadcast
+    broadcastMessage = _lobbyName +"|"+ _playerName + "|" + std::to_string(tcpPort);
+    broadcastClock.restart();
 }
 
 void LobbyWaitingState::HandleInput() {
@@ -92,6 +127,36 @@ void LobbyWaitingState::Update() {
         standartAnimation();
     }
     _tesseract->update();
+
+
+
+
+    if (broadcastClock.getElapsedTime().asSeconds() >= 1.0f) {
+        sendto(udpSocket, broadcastMessage.c_str(), broadcastMessage.size(), 0,
+               (sockaddr*)&broadcastAddr, sizeof(broadcastAddr));
+        broadcastClock.restart();
+    }
+
+    // Sprawdź połączenia TCP
+    fd_set readSet;
+    FD_ZERO(&readSet);
+    FD_SET(tcpSocket, &readSet);
+    timeval timeout = {0, 0};
+
+    if (select(tcpSocket + 1, &readSet, nullptr, nullptr, &timeout) > 0) {
+        sockaddr_in clientAddr;
+        socklen_t clientLen = sizeof(clientAddr);
+        int client = accept(tcpSocket, (sockaddr*)&clientAddr, &clientLen);
+
+        if (client >= 0) {
+            char ip[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &clientAddr.sin_addr, ip, INET_ADDRSTRLEN);
+            std::cout << "Gracz dołączył: " << ip << std::endl;
+            close(client);
+
+            
+        }
+    }
 }
 
 
@@ -215,5 +280,8 @@ LobbyWaitingState::~LobbyWaitingState() {
     delete _backButton;
     delete _backButtonText;
     delete _dotClock;
+
+    close(udpSocket);
+    close(tcpSocket);
 }
 
