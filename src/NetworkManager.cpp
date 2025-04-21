@@ -80,11 +80,8 @@ void NetworkManager::stopTCPListener() {
     listening = false;
 
     if (listenerThread.joinable() && std::this_thread::get_id() != listenerThread.get_id()) {
-        std::cout << "Stopping TCP listener thread...\n";
         try {
-            std::cout << "1";
             listenerThread.join();
-            std::cout << "2";
         } catch (const std::system_error& e) {
             std::cerr << "Błąd przy joinowaniu wątku: " << e.what() << std::endl;
         }

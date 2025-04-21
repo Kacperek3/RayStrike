@@ -1,6 +1,5 @@
 #pragma once
 #include <SFML/Graphics.hpp>
-#include <SFML/Network.hpp>
 #include "Game.h"
 #include "State.h"
 #include <unordered_map>
@@ -45,20 +44,6 @@ private:
     const float _exitAnimationSpeed = 80.0f;
 
 
-    sf::UdpSocket _udpSocket;
-    sf::Clock *_receiveClock;
-
-    struct LobbyInfo {
-        std::string name;
-        std::string hostPlayer;
-        sf::IpAddress ip;
-        sf::Time lastSeen;
-    };
-
-    std::unordered_map<std::string, LobbyInfo> _lobbies;
-
-    const unsigned short _broadcastPort = 54001;
-    const unsigned short _connectPort = 54000;
 
 
 };

@@ -62,8 +62,4 @@ private:
 
 
     NetworkManager _networkManager;
-
-
-   
-
 };
