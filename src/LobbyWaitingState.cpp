@@ -69,7 +69,7 @@ void LobbyWaitingState::Init() {
     int port = _networkManager.getTCPPort();
 
     // start broadcast
-    std::string message = _lobbyName + "|" + std::to_string(port);
+    std::string message = _lobbyName + "|" + std::to_string(port) + "|" + _playerName;
     _networkManager.startLobbyBroadcast(message, 8888);
 
     // obsługa połączenia TCP

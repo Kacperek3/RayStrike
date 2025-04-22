@@ -6,6 +6,8 @@
 #include <ctime>
 #include <cmath>
 
+#include "NetworkManager.h"
+
 
 
 class JoinLobbyState : public State {
@@ -41,9 +43,19 @@ private:
     sf::Sprite *_backgroundTexture;
     sf::Text *_titleText;
 
+    sf::RectangleShape *_backgroundForLobbyEntries;
+    sf::RectangleShape *_backgroundForLobbyEntriesPanel;
+    sf::Sprite *_reloadLobbiesButton;
+    sf::Text *_tittleNameLobby;
+    sf::Text *_tittleNamePlayer;
+    sf::Text *_tittleIpLobby;
+    
+
     const float _exitAnimationSpeed = 80.0f;
 
-
+    std::vector<sf::Text*> lobbyEntries;
+    std::vector<LobbyInfo> currentLobbies;
+    NetworkManager _networkManager;
 
 
 };

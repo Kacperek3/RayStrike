@@ -103,3 +103,91 @@ int NetworkManager::getTCPPort() const {
 void NetworkManager::onClientConnected(std::function<void(std::string)> callback) {
     clientConnectedCallback = callback;
 }
+
+
+void NetworkManager::startLobbyDiscovery(int port) {
+    discoverySocket = socket(AF_INET, SOCK_DGRAM, 0);
+    int enable = 1;
+    setsockopt(discoverySocket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
+    
+    sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = INADDR_ANY;
+    
+    if(bind(discoverySocket, (sockaddr*)&addr, sizeof(addr)) < 0) {
+        std::cerr << "Bind error in discovery\n";
+        return;
+    }
+
+    discovering = true;
+    discoveryThread = std::thread([=]() {
+        char buffer[1024];
+        timeval timeout{0, 100000};
+        setsockopt(discoverySocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+        
+        while(discovering) {
+            sockaddr_in from;
+            socklen_t fromLen = sizeof(from);
+            int len = recvfrom(discoverySocket, buffer, sizeof(buffer)-1, 0, (sockaddr*)&from, &fromLen);
+            
+            if(len > 0) {
+                buffer[len] = '\0';
+                std::string message(buffer);
+                size_t first_sep = message.find('|');
+
+                // TUTAJ ROZPOCZYNA SIĘ NOWY KOD
+                if (first_sep != std::string::npos) {
+                    std::string lobbyName = message.substr(0, first_sep);
+                    size_t second_sep = message.find('|', first_sep + 1);
+
+                    if (second_sep != std::string::npos) {
+                        std::string port_str = message.substr(first_sep + 1, second_sep - (first_sep + 1));
+                        int tcpPort = std::stoi(port_str);
+                        std::string playerName = message.substr(second_sep + 1);
+
+                        char ip[INET_ADDRSTRLEN];
+                        inet_ntop(AF_INET, &from.sin_addr, ip, INET_ADDRSTRLEN);
+
+                        LobbyInfo newLobby{
+                            lobbyName,
+                            ip,
+                            tcpPort,
+                            playerName,  // Dodano playerName
+                            time(nullptr)
+                        };
+
+                        std::lock_guard<std::mutex> lock(lobbyMutex);
+                        discoveredLobbies[newLobby.getUID()] = newLobby;
+                    } else {
+                        // Nieprawidłowa wiadomość (brak drugiego separatora)
+                    }
+                }
+                // TUTAJ KOŃCZY SIĘ NOWY KOD
+            }
+            
+            // Czyszczenie starych wpisów (CO 1 SEKUNDĘ)
+            auto now = time(nullptr);
+            std::lock_guard<std::mutex> lock(lobbyMutex);
+            for(auto it = discoveredLobbies.begin(); it != discoveredLobbies.end();) {
+                if(now - it->second.lastSeen > 5) {
+                    it = discoveredLobbies.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
+        close(discoverySocket);
+    });
+}
+
+void NetworkManager::stopLobbyDiscovery() {
+    discovering = false;
+    if(discoveryThread.joinable()) discoveryThread.join();
+}
+
+std::unordered_map<std::string, LobbyInfo> NetworkManager::getDiscoveredLobbies() {
+    std::lock_guard<std::mutex> lock(lobbyMutex);
+    return discoveredLobbies;
+}

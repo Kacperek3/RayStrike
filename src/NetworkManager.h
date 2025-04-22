@@ -5,7 +5,22 @@
 #include <atomic>
 #include <netinet/in.h>
 #include <fcntl.h>
+#include <unordered_map>
+#include <mutex>
+#include <sys/time.h>
 
+
+struct LobbyInfo {
+    std::string name;
+    std::string ip;
+    int port;
+    std::string playerName;
+    time_t lastSeen;
+
+    std::string getUID() const {
+        return ip + ":" + std::to_string(port);
+    }
+};
 
 class NetworkManager {
 public:
@@ -22,6 +37,12 @@ public:
 
     void onClientConnected(std::function<void(std::string)> callback);
 
+
+    void startLobbyDiscovery(int port = 8888);
+    void stopLobbyDiscovery();
+    std::unordered_map<std::string, LobbyInfo> getDiscoveredLobbies();
+
+
 private:
     int udpSocket;
     int tcpSocket;
@@ -35,4 +56,11 @@ private:
     std::thread listenerThread;
 
     std::function<void(std::string)> clientConnectedCallback;
+
+
+    int discoverySocket;
+    std::atomic<bool> discovering;
+    std::thread discoveryThread;
+    std::unordered_map<std::string, LobbyInfo> discoveredLobbies;
+    std::mutex lobbyMutex;
 };
