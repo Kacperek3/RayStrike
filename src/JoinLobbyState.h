@@ -53,8 +53,14 @@ private:
 
     const float _exitAnimationSpeed = 80.0f;
 
-    std::vector<sf::Text*> lobbyEntries;
-    std::vector<LobbyInfo> currentLobbies;
+    std::vector<sf::Text*> _lobbyEntries;
+    std::vector<sf::Text*> _playerEntries;
+    std::vector<sf::Text*> _ipEntries;
+    std::vector<sf::RectangleShape*> _lobbyEntriesBackgrounds;
+    std::vector<sf::RectangleShape*> _joinButtons;
+    std::vector<sf::Text*> _joinButtonsText;
+    
+    std::vector<LobbyInfo> _currentLobbies;
     NetworkManager _networkManager;
 
 

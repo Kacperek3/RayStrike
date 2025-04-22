@@ -60,48 +60,6 @@ void JoinLobbyState::Init(){
     _tittleIpLobby->setCharacterSize(23);
     _tittleIpLobby->setFillColor(sf::Color::White);
     _tittleIpLobby->setPosition(800, 218);
-
-
-    _networkManager.startLobbyDiscovery(8888);
-
-
-
-
-    auto lobbies = _networkManager.getDiscoveredLobbies();
-    currentLobbies.clear();
-    
-    // Sortowanie lobby według czasu ostatniej aktywności
-    std::vector<LobbyInfo> temp;
-    for(auto& pair : lobbies) {
-        temp.push_back(pair.second);
-    }
-    
-    // Sortowanie dla spójności wyświetlania
-    std::sort(temp.begin(), temp.end(), [](const LobbyInfo& a, const LobbyInfo& b) {
-        return a.lastSeen > b.lastSeen; 
-    });
-    
-    currentLobbies = temp;
-    
-    // Aktualizuj UI
-    const float startY = 200.0f;
-    const float spacing = 60.0f;
-    
-    // Usuń stare wpisy
-    for(auto entry : lobbyEntries) delete entry;
-    lobbyEntries.clear();
-    
-    // Stwórz nowe wpisy
-    for(size_t i = 0; i < currentLobbies.size(); ++i) {
-        std::cout << currentLobbies.size() << std::endl;
-        auto entry = new sf::Text();
-        entry->setFont(_font);
-        entry->setString(currentLobbies[i].name + " (" + currentLobbies[i].ip + ")");
-        entry->setCharacterSize(30);
-        entry->setFillColor(sf::Color::White);
-        entry->setPosition(100, startY + i * spacing);
-        lobbyEntries.push_back(entry);
-    }
    
 }
 
@@ -121,7 +79,7 @@ void JoinLobbyState::HandleInput() {
                     _networkManager.stopLobbyDiscovery();
                     _networkManager.startLobbyDiscovery(8888);
                     auto lobbies = _networkManager.getDiscoveredLobbies();
-                    currentLobbies.clear();
+                    _currentLobbies.clear();
                     
                     std::vector<LobbyInfo> temp;
                     for(auto& pair : lobbies) {
@@ -132,23 +90,59 @@ void JoinLobbyState::HandleInput() {
                         return a.lastSeen > b.lastSeen; 
                     });
                     
-                    currentLobbies = temp;
+                    _currentLobbies = temp;
                     
                     // Aktualizuj UI
                     const float startY = 300.0f;
                     const float spacing = 60.0f;
                     
-                    for(auto entry : lobbyEntries) delete entry;
-                    lobbyEntries.clear();
+                    for(auto entry : _lobbyEntries) delete entry;
+                    _lobbyEntries.clear();
+
+                    for(auto entry : _playerEntries) delete entry;
+                    _playerEntries.clear();
+
+                    for(auto entry : _ipEntries) delete entry;
+                    _ipEntries.clear();
                     
-                    for(size_t i = 0; i < currentLobbies.size(); ++i) {
+                    for(size_t i = 0; i < _currentLobbies.size(); ++i) {
                         auto entry = new sf::Text();
                         entry->setFont(_font);
-                        entry->setString(currentLobbies[i].name + "      " + currentLobbies[i].playerName + "        " + currentLobbies[i].ip);
+                        entry->setString(_currentLobbies[i].name);
                         entry->setCharacterSize(19);
                         entry->setFillColor(sf::Color::White);
-                        entry->setPosition(200, startY + i * spacing);
-                        lobbyEntries.push_back(entry);
+                        entry->setPosition(230, startY + i * spacing);
+                        _lobbyEntries.push_back(entry);
+
+                        auto playerEntry = new sf::Text();
+                        playerEntry->setFont(_font);
+                        playerEntry->setString(_currentLobbies[i].playerName);
+                        playerEntry->setCharacterSize(19);
+                        playerEntry->setFillColor(sf::Color::White);
+                        playerEntry->setPosition(510, startY + i * spacing);
+                        _playerEntries.push_back(playerEntry);
+
+                        auto ipEntry = new sf::Text();
+                        ipEntry->setFont(_font);
+                        ipEntry->setString(_currentLobbies[i].ip);
+                        ipEntry->setCharacterSize(16);
+                        ipEntry->setFillColor(sf::Color::White);
+                        ipEntry->setPosition(760, startY + i * spacing);
+                        _ipEntries.push_back(ipEntry);
+
+                        auto button = new sf::RectangleShape();
+                        button->setSize(sf::Vector2f(100, 35));
+                        button->setFillColor(sf::Color(80, 150, 255));
+                        button->setPosition(980, startY + i * spacing - 10);
+                        _joinButtons.push_back(button);
+
+                        auto buttonText = new sf::Text();
+                        buttonText->setFont(_font);
+                        buttonText->setString("Join");
+                        buttonText->setCharacterSize(20);
+                        buttonText->setFillColor(sf::Color::White);
+                        buttonText->setPosition(1002, startY + i * spacing - 5);
+                        _joinButtonsText.push_back(buttonText);
                     }
                 }
             }
@@ -229,10 +223,23 @@ void JoinLobbyState::Draw() {
     _data->window.draw(*_reloadLobbiesButton);
     _data->window.draw(*_titleText);
 
-    for(auto entry : lobbyEntries) {
+    for(auto entry : _lobbyEntries) {
         _data->window.draw(*entry);
-        //std::cout << entry->getString().toAnsiString() << std::endl;
     }
+    for(auto entry : _playerEntries) {
+        _data->window.draw(*entry);
+    }
+    for(auto entry : _ipEntries) {
+        _data->window.draw(*entry);
+    }
+    for(auto button : _joinButtons) {
+        _data->window.draw(*button);
+    }
+
+    for(auto buttonText : _joinButtonsText) {
+        _data->window.draw(*buttonText);
+    }
+
 
     _data->window.display();
 }
@@ -248,8 +255,16 @@ JoinLobbyState::~JoinLobbyState() {
     delete _reloadLobbiesButton;
     delete _titleText;
     _networkManager.stopLobbyDiscovery();
-    for(auto entry : lobbyEntries) delete entry;
-    lobbyEntries.clear();
+    for(auto entry : _lobbyEntries) delete entry;
+    _lobbyEntries.clear();
+    for(auto entry : _playerEntries) delete entry;
+    _playerEntries.clear();
+    for(auto entry : _ipEntries) delete entry;
+    _ipEntries.clear();
+    for(auto button : _joinButtons) delete button;
+    _joinButtons.clear();
+    for(auto buttonText : _joinButtonsText) delete buttonText;
+    _joinButtonsText.clear();
 }
 
 
