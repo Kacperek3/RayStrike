@@ -59,6 +59,7 @@ private:
     std::vector<sf::RectangleShape*> _lobbyEntriesBackgrounds;
     std::vector<sf::RectangleShape*> _joinButtons;
     std::vector<sf::Text*> _joinButtonsText;
+    std::vector<sf::RectangleShape*> _backgroundForOption;
     
     std::vector<LobbyInfo> _currentLobbies;
     NetworkManager _networkManager;

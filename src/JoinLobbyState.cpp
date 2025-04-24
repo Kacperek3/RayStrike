@@ -104,6 +104,15 @@ void JoinLobbyState::HandleInput() {
 
                     for(auto entry : _ipEntries) delete entry;
                     _ipEntries.clear();
+
+                    for(auto button : _joinButtons) delete button;
+                    _joinButtons.clear();
+
+                    for(auto buttonText : _joinButtonsText) delete buttonText;
+                    _joinButtonsText.clear();
+
+                    for(auto background : _backgroundForOption) delete background;
+                    _backgroundForOption.clear();
                     
                     for(size_t i = 0; i < _currentLobbies.size(); ++i) {
                         auto entry = new sf::Text();
@@ -143,6 +152,13 @@ void JoinLobbyState::HandleInput() {
                         buttonText->setFillColor(sf::Color::White);
                         buttonText->setPosition(1002, startY + i * spacing - 5);
                         _joinButtonsText.push_back(buttonText);
+
+                        auto backgroundForOption = new sf::RectangleShape();
+                        backgroundForOption->setSize(sf::Vector2f(950,65));
+                        backgroundForOption->setFillColor(sf::Color(120, 100, 90, 150));
+                        backgroundForOption->setPosition(165, startY + i * spacing - 26);
+                        _backgroundForOption.push_back(backgroundForOption);
+                        
                     }
                 }
             }
@@ -206,6 +222,17 @@ void JoinLobbyState::enteringAnimation() {
 }
 
 void JoinLobbyState::standartAnimation(){
+    sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
+
+    for(auto button : _joinButtons){
+        if(button->getGlobalBounds().contains(mousePos)){
+            button->setFillColor(sf::Color(100, 200, 255));
+            
+        } else {
+            button->setFillColor(sf::Color(80, 150, 255));
+        }
+    }
+
     return;
 }
 
@@ -222,6 +249,10 @@ void JoinLobbyState::Draw() {
     _data->window.draw(*_tittleIpLobby);
     _data->window.draw(*_reloadLobbiesButton);
     _data->window.draw(*_titleText);
+
+    for(auto backgroundForOption : _backgroundForOption) {
+        _data->window.draw(*backgroundForOption);
+    }
 
     for(auto entry : _lobbyEntries) {
         _data->window.draw(*entry);
@@ -265,6 +296,8 @@ JoinLobbyState::~JoinLobbyState() {
     _joinButtons.clear();
     for(auto buttonText : _joinButtonsText) delete buttonText;
     _joinButtonsText.clear();
+    for(auto background : _backgroundForOption) delete background;
+    _backgroundForOption.clear();
 }
 
 

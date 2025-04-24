@@ -3,6 +3,7 @@ project(RayStrike)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(SFML 2.6 COMPONENTS graphics window system REQUIRED)
 
