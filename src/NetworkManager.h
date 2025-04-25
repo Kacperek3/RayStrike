@@ -42,6 +42,9 @@ public:
     void stopLobbyDiscovery();
     std::unordered_map<std::string, LobbyInfo> getDiscoveredLobbies();
 
+    bool connectToServer(const std::string& ip, int port);
+    int getClientSocket() const;
+
 
 private:
     int udpSocket;
@@ -63,4 +66,6 @@ private:
     std::thread discoveryThread;
     std::unordered_map<std::string, LobbyInfo> discoveredLobbies;
     std::mutex lobbyMutex;
+
+    int clientSocket = -1;
 };

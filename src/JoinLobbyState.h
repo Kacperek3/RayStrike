@@ -45,6 +45,7 @@ private:
 
     sf::RectangleShape *_backgroundForLobbyEntries;
     sf::RectangleShape *_backgroundForLobbyEntriesPanel;
+    sf::RectangleShape * _spacer;
     sf::Sprite *_reloadLobbiesButton;
     sf::Text *_tittleNameLobby;
     sf::Text *_tittleNamePlayer;

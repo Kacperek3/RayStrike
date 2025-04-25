@@ -1,54 +1,43 @@
-#include "LobbyWaitingState.h"
 #include "LobbyState.h"
 
-LobbyWaitingState::LobbyWaitingState(GameDataRef data, std::string lobbyName, std::string playerName)
-    : _data(data), _lobbyName(lobbyName), _playerName(playerName) {
-    
-    _backButton = new sf::RectangleShape();
-    _backButtonText = new sf::Text();
-    _centralWaitingText = new sf::Text();
+LobbyState::LobbyState(GameDataRef data) : _data(data) {
+    srand(static_cast<unsigned>(time(NULL)));
 
     _backgroundTexture = new sf::Sprite();
     _titleText = new sf::Text();
-    _tesseract = new Tesseract();
 
-    _dotClock = new sf::Clock();
+    _backButton = new sf::RectangleShape();
+    _backButtonText = new sf::Text();
+    
 }
 
-void LobbyWaitingState::Init() {
+void LobbyState::Init(){
     if (!_font.loadFromFile("assets/fonts/Orbitron/Orbitron-VariableFont_wght.ttf")) {
         std::cout << "Failed to load font" << std::endl;
     }
+
+
 
     _data->assetManager.LoadTexture("background", "assets/background.jpg");
     _backgroundTexture->setTexture(_data->assetManager.GetTexture("background"));
 
     _titleText->setFont(_font);
-    _titleText->setString("Lobby Created");
+    _titleText->setString("Lobby");
     _titleText->setCharacterSize(50);
     _titleText->setFillColor(sf::Color::White);
-    _titleText->setPosition(_data->window.getSize().x, 100);
-    
-    _centralWaitingText->setFont(_font);
-    _centralWaitingText->setString("Waiting for players");
-    _centralWaitingText->setCharacterSize(25);
-    _centralWaitingText->setFillColor(sf::Color::Red);
-    _centralWaitingText->setPosition(_data->window.getSize().x, 400);
+    _titleText->setPosition(_data->window.getSize().x,100);
 
-
-    _tesseract->setPosition(sf::Vector2f(620, 400));
-    _tesseract->setScale(3.0f);
-
-    //buttons
     _backButton->setSize(sf::Vector2f(250, 50));
     _backButton->setFillColor(sf::Color(80, 150, 255,150));
-    _backButton->setPosition(sf::Vector2f(515, 700));
+    _backButton->setPosition(sf::Vector2f(300, 700));
 
     _backButtonText->setFont(_font);
     _backButtonText->setString("Back");
     _backButtonText->setCharacterSize(30);
     _backButtonText->setFillColor(sf::Color::White);
     _backButtonText->setPosition(_backButton->getPosition().x + 70, _backButton->getPosition().y + 8);
+
+   
 
     auto storeButtonData = [&](sf::RectangleShape* btn, sf::Text* txt) {
         sf::Vector2f originalBtnPos = btn->getPosition();
@@ -58,42 +47,25 @@ void LobbyWaitingState::Init() {
         _buttonData[btn] = {originalBtnPos, originalTxtPos, originalBounds, originalColor};
     };
     storeButtonData(_backButton, _backButtonText);  
+    
 
     _backButton->setPosition(1100, 700);
     _backButtonText->setPosition(1170, 708);
-    
 
-
-
-    // network
-    _networkManager.startTCPListener(); 
-    int port = _networkManager.getTCPPort();
-
-    // start broadcast
-    std::string message = _lobbyName + "|" + std::to_string(port) + "|" + _playerName;
-    _networkManager.startLobbyBroadcast(message, 8888);
-
-    // obsługa połączenia TCP
-    _networkManager.onClientConnected([this](std::string ip) {
-        _data->stateManager.AddState(StateRef(new LobbyState(_data)), true);
-
-        
-    });
 }
 
-void LobbyWaitingState::HandleInput() {
+void LobbyState::HandleInput() {
     sf::Event event;
     while (_data->window.pollEvent(event)) {
         if (event.type == sf::Event::Closed) {
             _data->window.close();
             return;
         }
-        if (event.type == sf::Event::MouseButtonPressed) {
+        if(event.type == sf::Event::MouseButtonPressed ) {
             if (event.mouseButton.button == sf::Mouse::Left) {
                 sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
                 if (_backButton->getGlobalBounds().contains(mousePos)) {
                     _animationState = AnimationState::EXITING;
-                    _data->stateManager.RemoveState();
                 }
             }
             return;
@@ -101,30 +73,64 @@ void LobbyWaitingState::HandleInput() {
     }
 }
 
-void LobbyWaitingState::Update() {
-    if (_animationState == AnimationState::ENTERING) {
+void LobbyState::Update() {
+    // Animation logic
+    if(_animationState == AnimationState::ENTERING) {
         enteringAnimation();
-    } else if (_animationState == AnimationState::EXITING) {
+    } else if(_animationState == AnimationState::EXITING) {
         exitingAnimation();
     } else {
         standartAnimation();
     }
-    _tesseract->update();
 
 }
 
 
+void LobbyState::exitingAnimation() {
+    
+    bool allButtonsOffScreen = false;
 
-void LobbyWaitingState::exitingAnimation() {
-    
-    
+    for (auto& [button, data] : _buttonData) {
+        auto& [originalBtnPos, originalTxtPos, originalBounds, originalColor] = data;
+        
+        sf::Vector2f newPos = button->getPosition();
+        newPos.x += _exitAnimationSpeed;
+        button->setPosition(newPos);
+        _titleText->setPosition(_titleText->getPosition().x + _exitAnimationSpeed, _titleText->getPosition().y);
+
+
+        sf::Text* text = nullptr;
+        if (button == _backButton) text = _backButtonText;
+        
+        if (text) {
+            sf::Vector2f textPos = text->getPosition();
+            textPos.x += _exitAnimationSpeed;
+            text->setPosition(textPos);
+        }
+        if (newPos.x >= _data->window.getSize().x) {
+            allButtonsOffScreen = true;
+        }
+    }
+
+    sf::Vector2f currentPos = _titleText->getPosition();
+
+    if (currentPos.x < _data->window.getSize().x) {
+        currentPos.x += _exitAnimationSpeed;
+        _titleText->setPosition(currentPos);
+    }
+    if (currentPos.x >= _data->window.getSize().x && allButtonsOffScreen) {
+        currentPos.x = _data->window.getSize().x;
+        _animationState = AnimationState::ENTERING;
+        _data->stateManager.RemoveState();
+    }
     
     return;
 }
 
-void LobbyWaitingState::enteringAnimation() {
+void LobbyState::enteringAnimation() {
     bool allButtonsOffScreen = true;
     bool allTextFieldsOffScreen = true;
+
 
     for (auto& [button, data] : _buttonData) {
         auto& [originalBtnPos, originalTxtPos, originalBounds, originalColor] = data;
@@ -151,25 +157,13 @@ void LobbyWaitingState::enteringAnimation() {
     }
 
 
-    sf::Vector2f newPos = _centralWaitingText->getPosition();
     
-    if(newPos.x > 0){
-        newPos.x -= _exitAnimationSpeed + 50;
-        if(newPos.x <= 495){
-            newPos.x = 495;
-            allTextFieldsOffScreen = false;
-        }
-
-        if(newPos.x >= 495) _centralWaitingText->setPosition(newPos);
-    }
-
-
     sf::Vector2f currentPos = _titleText->getPosition();
 
     if (currentPos.x > 0) {
         currentPos.x -= _exitAnimationSpeed;
-        if (currentPos.x <= 405 && !allButtonsOffScreen && !allTextFieldsOffScreen) {
-            currentPos.x = 405;
+        if (currentPos.x <= 450){
+            currentPos.x = 450;
             _animationState = AnimationState::NONE;
         }
         
@@ -178,20 +172,7 @@ void LobbyWaitingState::enteringAnimation() {
     }
 }
 
-void LobbyWaitingState::standartAnimation(){
-    if (_dotClock->getElapsedTime().asSeconds() >= 0.1f) {
-        _dotClock->restart();
-        
-        _charIndex++;
-        if (_charIndex > _baseText.size()) {
-            _charIndex = 0;
-            _centralWaitingText->setString("");
-        } else {
-            _centralWaitingText->setString(_baseText.substr(0, _charIndex));
-        }
-    }
-
-
+void LobbyState::standartAnimation(){
     sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
     const float hoverOffset = 10.f;
     const sf::Color hoverColor(0, 59, 190);
@@ -214,28 +195,30 @@ void LobbyWaitingState::standartAnimation(){
 }
 
 
-void LobbyWaitingState::Draw() {
+
+
+void LobbyState::Draw() {
     _data->window.clear();
     _data->window.draw(*_backgroundTexture);
-    _tesseract->draw(_data->window);
     _data->window.draw(*_titleText);
-    _data->window.draw(*_centralWaitingText);
+
     _data->window.draw(*_backButton);
     _data->window.draw(*_backButtonText);
+
+    
     _data->window.display();
 }
 
 
-LobbyWaitingState::~LobbyWaitingState() {
+LobbyState::~LobbyState() {
     delete _backgroundTexture;
-    delete _tesseract;
     delete _titleText;
-    delete _centralWaitingText;
     delete _backButton;
     delete _backButtonText;
-    delete _dotClock;
-
-    _networkManager.stopTCPListener();
-    _networkManager.stopLobbyBroadcast();
 }
 
+
+void LobbyState::ClearObjects() {
+   // _data->assetManager.clearAssets();
+    //_data->soundManager.ClearSounds();
+}

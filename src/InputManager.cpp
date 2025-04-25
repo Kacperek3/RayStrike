@@ -51,7 +51,7 @@ bool InputManager::IsSpriteClickedAccurate(sf::Sprite object, sf::Mouse::Button 
     return false;
 }
 
-bool InputManager::IsSpriteHover(sf::Sprite object, sf::Mouse::Button button, sf::RenderWindow &window) {
+bool InputManager::IsSpriteHover(sf::Sprite object, sf::RenderWindow &window) {
     sf::IntRect tempRect(object.getPosition().x, object.getPosition().y, object.getGlobalBounds().width, object.getGlobalBounds().height);
     if (tempRect.contains(sf::Mouse::getPosition(window))) {
         return true;

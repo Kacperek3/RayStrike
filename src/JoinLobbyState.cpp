@@ -1,4 +1,5 @@
 #include "JoinLobbyState.h"
+#include "LobbyState.h"
 
 JoinLobbyState::JoinLobbyState(GameDataRef data) : _data(data) {
     srand(static_cast<unsigned>(time(NULL)));
@@ -11,6 +12,7 @@ JoinLobbyState::JoinLobbyState(GameDataRef data) : _data(data) {
     _tittleNameLobby = new sf::Text();
     _tittleNamePlayer = new sf::Text();
     _tittleIpLobby = new sf::Text();
+    _spacer = new sf::RectangleShape();
 }
 
 void JoinLobbyState::Init(){
@@ -22,6 +24,7 @@ void JoinLobbyState::Init(){
     _data->assetManager.LoadTexture("background", "assets/background.jpg");
     _backgroundTexture->setTexture(_data->assetManager.GetTexture("background"));
     _data->assetManager.LoadTexture("reloadLobbiesButton", "assets/flair_arrow_3.png");
+    _data->assetManager.LoadTexture("reloadLobbiesButtonHover", "assets/flair_arrow_3_hover.png");
 
     _titleText->setFont(_font);
     _titleText->setString("Join Lobby");
@@ -39,6 +42,10 @@ void JoinLobbyState::Init(){
     _backgroundForLobbyEntriesPanel->setSize(sf::Vector2f(950,65));
     _backgroundForLobbyEntriesPanel->setFillColor(sf::Color(88, 88, 88, 200));
     _backgroundForLobbyEntriesPanel->setPosition(165, 200);
+
+    _spacer->setSize(sf::Vector2f(950, 5));
+    _spacer->setFillColor(sf::Color(255, 255, 255, 200));
+    _spacer->setPosition(165, 265);
 
     _reloadLobbiesButton->setTexture(_data->assetManager.GetTexture("reloadLobbiesButton"));
     _reloadLobbiesButton->setPosition(1000, 202);
@@ -61,6 +68,7 @@ void JoinLobbyState::Init(){
     _tittleIpLobby->setFillColor(sf::Color::White);
     _tittleIpLobby->setPosition(800, 218);
    
+   _networkManager.startLobbyDiscovery(8888);
 }
 
 void JoinLobbyState::HandleInput() {
@@ -76,8 +84,8 @@ void JoinLobbyState::HandleInput() {
                 
 
                 if(_data->inputManager.IsSpriteClicked(*_reloadLobbiesButton, sf::Mouse::Left, _data->window)) {
-                    _networkManager.stopLobbyDiscovery();
-                    _networkManager.startLobbyDiscovery(8888);
+                   
+                    
                     auto lobbies = _networkManager.getDiscoveredLobbies();
                     _currentLobbies.clear();
                     
@@ -93,8 +101,8 @@ void JoinLobbyState::HandleInput() {
                     _currentLobbies = temp;
                     
                     // Aktualizuj UI
-                    const float startY = 300.0f;
-                    const float spacing = 60.0f;
+                    const float startY = 296.0f;
+                    const float spacing = 63.0f;
                     
                     for(auto entry : _lobbyEntries) delete entry;
                     _lobbyEntries.clear();
@@ -155,10 +163,24 @@ void JoinLobbyState::HandleInput() {
 
                         auto backgroundForOption = new sf::RectangleShape();
                         backgroundForOption->setSize(sf::Vector2f(950,65));
-                        backgroundForOption->setFillColor(sf::Color(120, 100, 90, 150));
+                        backgroundForOption->setFillColor(sf::Color(  115, 123, 146   , 150));
                         backgroundForOption->setPosition(165, startY + i * spacing - 26);
                         _backgroundForOption.push_back(backgroundForOption);
                         
+                    }
+                }
+                for(size_t i = 0; i < _joinButtons.size(); ++i) {
+                    if(_joinButtons[i]->getGlobalBounds().contains(mousePos)) {
+                        if(i < _currentLobbies.size()) {
+                            LobbyInfo lobby = _currentLobbies[i];
+                            
+                            if(_networkManager.connectToServer(lobby.ip, lobby.port)) {
+                                _data->stateManager.AddState(StateRef(new LobbyState(_data)), false);
+                            }
+                            else {
+                                std::cerr << "Failed to connect to server" << std::endl;
+                            }
+                        }
                     }
                 }
             }
@@ -232,6 +254,11 @@ void JoinLobbyState::standartAnimation(){
             button->setFillColor(sf::Color(80, 150, 255));
         }
     }
+    if(_data->inputManager.IsSpriteHover(*_reloadLobbiesButton, _data->window)) {
+        _reloadLobbiesButton->setTexture(_data->assetManager.GetTexture("reloadLobbiesButtonHover"));
+    } else {
+        _reloadLobbiesButton->setTexture(_data->assetManager.GetTexture("reloadLobbiesButton"));
+    }
 
     return;
 }
@@ -244,6 +271,7 @@ void JoinLobbyState::Draw() {
     _data->window.draw(*_backgroundTexture);
     _data->window.draw(*_backgroundForLobbyEntries);
     _data->window.draw(*_backgroundForLobbyEntriesPanel);
+    _data->window.draw(*_spacer);
     _data->window.draw(*_tittleNameLobby);
     _data->window.draw(*_tittleNamePlayer);
     _data->window.draw(*_tittleIpLobby);
@@ -280,6 +308,7 @@ JoinLobbyState::~JoinLobbyState() {
     delete _backgroundTexture;
     delete _backgroundForLobbyEntries;
     delete _backgroundForLobbyEntriesPanel;
+    delete _spacer;
     delete _tittleNameLobby;
     delete _tittleNamePlayer;
     delete _tittleIpLobby;

@@ -137,7 +137,6 @@ void NetworkManager::startLobbyDiscovery(int port) {
                 std::string message(buffer);
                 size_t first_sep = message.find('|');
 
-                // TUTAJ ROZPOCZYNA SIĘ NOWY KOD
                 if (first_sep != std::string::npos) {
                     std::string lobbyName = message.substr(0, first_sep);
                     size_t second_sep = message.find('|', first_sep + 1);
@@ -154,17 +153,16 @@ void NetworkManager::startLobbyDiscovery(int port) {
                             lobbyName,
                             ip,
                             tcpPort,
-                            playerName,  // Dodano playerName
+                            playerName, 
                             time(nullptr)
                         };
 
                         std::lock_guard<std::mutex> lock(lobbyMutex);
                         discoveredLobbies[newLobby.getUID()] = newLobby;
                     } else {
-                        // Nieprawidłowa wiadomość (brak drugiego separatora)
+                        std::cerr << "Invalid message format: " << message << std::endl;
                     }
                 }
-                // TUTAJ KOŃCZY SIĘ NOWY KOD
             }
             
             // Czyszczenie starych wpisów (CO 1 SEKUNDĘ)
@@ -190,4 +188,34 @@ void NetworkManager::stopLobbyDiscovery() {
 std::unordered_map<std::string, LobbyInfo> NetworkManager::getDiscoveredLobbies() {
     std::lock_guard<std::mutex> lock(lobbyMutex);
     return discoveredLobbies;
+}
+
+bool NetworkManager::connectToServer(const std::string& ip, int port) {
+    clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (clientSocket < 0) {
+        perror("socket");
+        return false;
+    }
+    
+    sockaddr_in serverAddr{};
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(port);
+    
+    if(inet_pton(AF_INET, ip.c_str(), &serverAddr.sin_addr) <= 0) {
+        perror("inet_pton");
+        close(clientSocket);
+        return false;
+    }
+    
+    if(connect(clientSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
+        perror("connect");
+        close(clientSocket);
+        return false;
+    }
+    
+    return true;
+}
+
+int NetworkManager::getClientSocket() const {
+    return clientSocket;
 }
