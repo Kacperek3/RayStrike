@@ -1,7 +1,6 @@
 #include "NetworkGameManager.h"
 
-NetworkGameManager::NetworkGameManager(bool isServer, const std::string& ip, int port)
-    : _isServer(isServer), _clientSocket(-1)
+NetworkGameManager::NetworkGameManager(bool isServer, const std::string& ip, int port) : _isServer(isServer)
 {
     _socket = socket(AF_INET, SOCK_STREAM, 0);
     if (_socket == -1) {

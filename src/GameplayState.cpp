@@ -5,7 +5,7 @@ GameplayState::GameplayState(GameDataRef data) : _data(data) {
     _titleText = new sf::Text();
     _playerCircle = new sf::CircleShape();
     _enemyCircle = new sf::CircleShape();
-    _networkManager = new NetworkGameManager(true /*lub false*/, "adresIP", 54000);
+    _networkManager = new NetworkGameManager(true, "192.168.107.161", 54000);
 
     _clock = new sf::Clock();
 }
@@ -101,16 +101,16 @@ void GameplayState::Update() {
 
 
     if (_networkManager->IsServer()) {
-        // Serwer steruje enemyCircle, a klient playerCircle
-        _enemyCircle->move(movement);
-        _networkManager->SendPosition(_enemyCircle->getPosition().x, _enemyCircle->getPosition().y);
+        // Server: Move and send own player's position, receive client's position into enemy
+        _playerCircle->move(movement);
+        _networkManager->SendPosition(_playerCircle->getPosition().x, _playerCircle->getPosition().y);
     
         float otherX, otherY;
         if (_networkManager->ReceivePosition(otherX, otherY)) {
-            _playerCircle->setPosition(otherX, otherY);
+            _enemyCircle->setPosition(otherX, otherY);
         }
     } else {
-        // Klient steruje playerCircle, a serwer enemyCircle
+        // Client: Move and send own player's position, receive server's position into enemy
         _playerCircle->move(movement);
         _networkManager->SendPosition(_playerCircle->getPosition().x, _playerCircle->getPosition().y);
     

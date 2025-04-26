@@ -9,7 +9,7 @@
 
 class NetworkGameManager {
 public:
-    NetworkGameManager(bool isServer, const std::string& ip = "192.168.107.161", int port = 54000);
+    NetworkGameManager::NetworkGameManager(bool isServer, const std::string& ip, int port);
     ~NetworkGameManager();
 
     void SendPosition(float x, float y);
