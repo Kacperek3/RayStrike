@@ -100,25 +100,15 @@ void GameplayState::Update() {
     }
 
 
-    if (_networkManager->IsServer()) {
-        // Server: Move and send own player's position, receive client's position into enemy
-        _playerCircle->move(movement);
-        _networkManager->SendPosition(_playerCircle->getPosition().x, _playerCircle->getPosition().y);
-    
-        float otherX, otherY;
-        if (_networkManager->ReceivePosition(otherX, otherY)) {
-            _enemyCircle->setPosition(otherX, otherY);
-        }
-    } else {
-        // Client: Move and send own player's position, receive server's position into enemy
-        _playerCircle->move(movement);
-        _networkManager->SendPosition(_playerCircle->getPosition().x, _playerCircle->getPosition().y);
-    
-        float otherX, otherY;
-        if (_networkManager->ReceivePosition(otherX, otherY)) {
-            _enemyCircle->setPosition(otherX, otherY);
-        }
-    }
+   float otherX, otherY;
+    _networkManager->GetEnemyPosition(otherX, otherY);
+    _enemyCircle->setPosition(otherX, otherY);
+
+    // Wyślij pozycję gracza
+    _networkManager->SendPosition(
+        _playerCircle->getPosition().x,
+        _playerCircle->getPosition().y
+    );
     
 
 }
