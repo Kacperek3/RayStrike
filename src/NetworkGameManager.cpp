@@ -22,29 +22,25 @@ NetworkGameManager::NetworkGameManager(bool isServer, const std::string& ip, int
     hint.sin_port = htons(port);
     inet_pton(AF_INET, ip.c_str(), &hint.sin_addr);
 
-    if (_isServer) {
-        if (bind(_socket, (sockaddr*)&hint, sizeof(hint)) < 0) {
-            std::cerr << "Bind failed: " << strerror(errno) << std::endl;
-            return;
-        }
-
-        listen(_socket, SOMAXCONN);
-
-        sockaddr_in client{};
-        socklen_t clientSize = sizeof(client);
-        _clientSocket = accept(_socket, (sockaddr*)&client, &clientSize);
-        if (_clientSocket == -1) {
-            std::cerr << "Accept failed: " << strerror(errno) << std::endl;
-            return;
-        }
-
-        // Ustaw gniazdo klienta jako nieblokujące
-        flags = fcntl(_clientSocket, F_GETFL, 0);
-        fcntl(_clientSocket, F_SETFL, flags | O_NONBLOCK);
-    } else {
-        if (connect(_socket, (sockaddr*)&hint, sizeof(hint)) < 0 && errno != EINPROGRESS) {
-            std::cerr << "Connect failed: " << strerror(errno) << std::endl;
-            return;
+   // NetworkGameManager.cpp - poprawiona sekcja connect
+    if (!_isServer) {
+        if (connect(_socket, (sockaddr*)&hint, sizeof(hint)) < 0) {
+            if (errno != EINPROGRESS) { // Tylko dla non-blocking socket
+                std::cerr << "Connect failed: " << strerror(errno) << std::endl;
+                close(_socket);
+                return;
+            }
+            
+            // Czekaj na zakończenie połączenia (ważne dla non-blocking)
+            fd_set set;
+            FD_ZERO(&set);
+            FD_SET(_socket, &set);
+            timeval timeout{5, 0}; // 5 sekund timeout
+            if (select(_socket + 1, nullptr, &set, nullptr, &timeout) <= 0) {
+                std::cerr << "Connection timeout" << std::endl;
+                close(_socket);
+                return;
+            }
         }
     }
 
@@ -104,10 +100,21 @@ void NetworkGameManager::GetEnemyPosition(float& x, float& y) {
 }
 // NetworkGameManager.cpp
 void NetworkGameManager::SendPosition(float x, float y) {
-    float data[2] = {x, y};
     int currentSocket = _isServer ? _clientSocket : _socket;
     
-    if (send(currentSocket, data, sizeof(data), 0) == -1) {
-        std::cerr << "Send failed: " << strerror(errno) << std::endl;
+    if (currentSocket <= 0) {
+        std::cerr << "Invalid socket descriptor!" << std::endl;
+        return;
+    }
+
+    float data[2] = {x, y};
+    int result = send(currentSocket, data, sizeof(data), MSG_NOSIGNAL);
+    
+    if (result == -1) {
+        if (errno == EPIPE) {
+            std::cerr << "Connection closed by peer" << std::endl;
+        } else {
+            std::cerr << "Send error: " << strerror(errno) << std::endl;
+        }
     }
 }
