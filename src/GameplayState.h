@@ -7,7 +7,7 @@
 #include <cmath>
 
 #include "NetworkManager.h"
-
+#include "NetworkGameManager.h"
 
 
 class GameplayState : public State {
@@ -40,30 +40,14 @@ private:
     AnimationState _animationState = AnimationState::ENTERING;
 
     sf::Font _font;
-    // sf::Sprite *_backgroundTexture;
     sf::Text *_titleText;
 
-    // sf::RectangleShape *_backgroundForLobbyEntries;
-    // sf::RectangleShape *_backgroundForLobbyEntriesPanel;
-    // sf::RectangleShape * _spacer;
-    // sf::Sprite *_reloadLobbiesButton;
-    // sf::Text *_tittleNameLobby;
-    // sf::Text *_tittleNamePlayer;
-    // sf::Text *_tittleIpLobby;
-
-
     const float _exitAnimationSpeed = 80.0f;
+    sf::CircleShape *_playerCircle;
+    sf::CircleShape *_enemyCircle;
+    sf::Clock *_clock;
 
-    // std::vector<sf::Text*> _lobbyEntries;
-    // std::vector<sf::Text*> _playerEntries;
-    // std::vector<sf::Text*> _ipEntries;
-    // std::vector<sf::RectangleShape*> _lobbyEntriesBackgrounds;
-    // std::vector<sf::RectangleShape*> _joinButtons;
-    // std::vector<sf::Text*> _joinButtonsText;
-    // std::vector<sf::RectangleShape*> _backgroundForOption;
-    //
-    // std::vector<LobbyInfo> _currentLobbies;
-    // NetworkManager _networkManager;
+    NetworkGameManager* _networkManager;
 
 
 };

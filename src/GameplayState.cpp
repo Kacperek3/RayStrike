@@ -2,16 +2,12 @@
 
 GameplayState::GameplayState(GameDataRef data) : _data(data) {
     srand(static_cast<unsigned>(time(NULL)));
-
-    // _backgroundTexture = new sf::Sprite();
-    // _reloadLobbiesButton = new sf::Sprite();
     _titleText = new sf::Text();
-    // _backgroundForLobbyEntries = new sf::RectangleShape();
-    // _backgroundForLobbyEntriesPanel = new sf::RectangleShape();
-    // _tittleNameLobby = new sf::Text();
-    // _tittleNamePlayer = new sf::Text();
-    // _tittleIpLobby = new sf::Text();
-    // _spacer = new sf::RectangleShape();
+    _playerCircle = new sf::CircleShape();
+    _enemyCircle = new sf::CircleShape();
+    _networkManager = new NetworkGameManager(true /*lub false*/, "adresIP", 54000);
+
+    _clock = new sf::Clock();
 }
 
 void GameplayState::Init(){
@@ -21,7 +17,6 @@ void GameplayState::Init(){
     
 
     _data->assetManager.LoadTexture("background", "assets/background.jpg");
-    // _backgroundTexture->setTexture(_data->assetManager.GetTexture("background"));
     _data->assetManager.LoadTexture("reloadLobbiesButton", "assets/flair_arrow_3.png");
     _data->assetManager.LoadTexture("reloadLobbiesButtonHover", "assets/flair_arrow_3_hover.png");
 
@@ -33,40 +28,23 @@ void GameplayState::Init(){
 
     _titleText->setPosition(_data->window.getSize().x,60);
 
+    _playerCircle->setRadius(20);
+    _playerCircle->setFillColor(sf::Color(255, 0, 0));
+    _playerCircle->setPosition(100, 100);
+    _playerCircle->setOrigin(_playerCircle->getRadius(), _playerCircle->getRadius());
+    _playerCircle->setOutlineThickness(2);
+    _playerCircle->setOutlineColor(sf::Color(0, 0, 0));
+    _playerCircle->setPointCount(30);
 
-    // _backgroundForLobbyEntries->setSize(sf::Vector2f(950, 600));
-    // _backgroundForLobbyEntries->setFillColor(sf::Color(58, 58, 58, 200));
-    // _backgroundForLobbyEntries->setPosition(165, 200);
-    //
-    // _backgroundForLobbyEntriesPanel->setSize(sf::Vector2f(950,65));
-    // _backgroundForLobbyEntriesPanel->setFillColor(sf::Color(88, 88, 88, 200));
-    // _backgroundForLobbyEntriesPanel->setPosition(165, 200);
-    //
-    // _spacer->setSize(sf::Vector2f(950, 5));
-    // _spacer->setFillColor(sf::Color(255, 255, 255, 200));
-    // _spacer->setPosition(165, 265);
-    //
-    // _reloadLobbiesButton->setTexture(_data->assetManager.GetTexture("reloadLobbiesButton"));
-    // _reloadLobbiesButton->setPosition(1000, 202);
-    //
-    // _tittleNameLobby->setFont(_font);
-    // _tittleNameLobby->setString("Lobby Name");
-    // _tittleNameLobby->setCharacterSize(23);
-    // _tittleNameLobby->setFillColor(sf::Color::White);
-    // _tittleNameLobby->setPosition(200, 218);
-    //
-    // _tittleNamePlayer->setFont(_font);
-    // _tittleNamePlayer->setString("Player Name");
-    // _tittleNamePlayer->setCharacterSize(23);
-    // _tittleNamePlayer->setFillColor(sf::Color::White);
-    // _tittleNamePlayer->setPosition(480, 218);
-    //
-    // _tittleIpLobby->setFont(_font);
-    // _tittleIpLobby->setString("IP");
-    // _tittleIpLobby->setCharacterSize(23);
-    // _tittleIpLobby->setFillColor(sf::Color::White);
-    // _tittleIpLobby->setPosition(800, 218);
-   
+    _enemyCircle->setRadius(20);
+    _enemyCircle->setFillColor(sf::Color(0, 0, 255));
+    _enemyCircle->setPosition(200, 200);
+    _enemyCircle->setOrigin(_enemyCircle->getRadius(), _enemyCircle->getRadius());
+    _enemyCircle->setOutlineThickness(2);
+    _enemyCircle->setOutlineColor(sf::Color(0, 0, 0));
+    _enemyCircle->setPointCount(30);
+
+
 }
 
 void GameplayState::HandleInput() {
@@ -91,19 +69,50 @@ void GameplayState::HandleInput() {
 }
 
 void GameplayState::Update() {
+    const float moveSpeed = 200.0f; // piksele na sekundę
+
+    float deltaTime = _clock->restart().asSeconds(); // czas od ostatniej klatki
+
+    sf::Vector2f movement(0.f, 0.f);
+
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
+        movement.y -= moveSpeed * deltaTime;
+    }
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
+        movement.y += moveSpeed * deltaTime;
+    }
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
+        movement.x -= moveSpeed * deltaTime;
+    }
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
+        movement.x += moveSpeed * deltaTime;
+    }
+
+    _playerCircle->move(movement);
 
     // Animation logic
-    if(_animationState == AnimationState::ENTERING) {
+    if (_animationState == AnimationState::ENTERING) {
         enteringAnimation();
-    } else if(_animationState == AnimationState::EXITING) {
+    } else if (_animationState == AnimationState::EXITING) {
         exitingAnimation();
     } else {
         standartAnimation();
     }
 
 
-}
+    // wysyłaj swoją pozycję
+    _networkManager->SendPosition(_playerCircle->getPosition().x, _playerCircle->getPosition().y);
 
+    // odbieraj pozycję drugiego gracza
+    float otherX, otherY;
+    if (_networkManager->ReceivePosition(otherX, otherY)) {
+        _enemyCircle->setPosition(otherX, otherY);
+    } else {
+        std::cout << "Failed to receive position" << std::endl;
+        
+    }
+
+}
 
 void GameplayState::exitingAnimation() {
     
@@ -141,50 +150,15 @@ void GameplayState::enteringAnimation() {
 
 void GameplayState::standartAnimation(){
     sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
-    // if(_data->inputManager.IsSpriteHover(*_reloadLobbiesButton, _data->window)) {
-    //     _reloadLobbiesButton->setTexture(_data->assetManager.GetTexture("reloadLobbiesButtonHover"));
-    // } else {
-    //     _reloadLobbiesButton->setTexture(_data->assetManager.GetTexture("reloadLobbiesButton"));
-    // }
 
     return;
 }
 
-
-
-
 void GameplayState::Draw() {
     _data->window.clear();
-    // _data->window.draw(*_backgroundTexture);
-    // _data->window.draw(*_backgroundForLobbyEntries);
-    // _data->window.draw(*_backgroundForLobbyEntriesPanel);
-    // _data->window.draw(*_spacer);
-    // _data->window.draw(*_tittleNameLobby);
-    // _data->window.draw(*_tittleNamePlayer);
-    // _data->window.draw(*_tittleIpLobby);
-    // _data->window.draw(*_reloadLobbiesButton);
     _data->window.draw(*_titleText);
-
-    // for(auto backgroundForOption : _backgroundForOption) {
-    //     _data->window.draw(*backgroundForOption);
-    // }
-    //
-    // for(auto entry : _lobbyEntries) {
-    //     _data->window.draw(*entry);
-    // }
-    // for(auto entry : _playerEntries) {
-    //     _data->window.draw(*entry);
-    // }
-    // for(auto entry : _ipEntries) {
-    //     _data->window.draw(*entry);
-    // }
-    // for(auto button : _joinButtons) {
-    //     _data->window.draw(*button);
-    // }
-    //
-    // for(auto buttonText : _joinButtonsText) {
-    //     _data->window.draw(*buttonText);
-    // }
+    _data->window.draw(*_playerCircle);
+    _data->window.draw(*_enemyCircle);
 
 
     _data->window.display();
@@ -192,19 +166,15 @@ void GameplayState::Draw() {
 
 
 GameplayState::~GameplayState() {
-    // delete _backgroundTexture;
-    // delete _backgroundForLobbyEntries;
-    // delete _backgroundForLobbyEntriesPanel;
-    // delete _spacer;
-    // delete _tittleNameLobby;
-    // delete _tittleNamePlayer;
-    // delete _tittleIpLobby;
-    // delete _reloadLobbiesButton;
     delete _titleText;
+    delete _playerCircle;
+    delete _enemyCircle;
+    delete _clock;
+    delete _networkManager;
+    
 }
 
 
 void GameplayState::ClearObjects() {
-   // _data->assetManager.clearAssets();
-    //_data->soundManager.ClearSounds();
+
 }
