@@ -100,17 +100,26 @@ void GameplayState::Update() {
     }
 
 
-    // wysyłaj swoją pozycję
-    _networkManager->SendPosition(_playerCircle->getPosition().x, _playerCircle->getPosition().y);
-
-    // odbieraj pozycję drugiego gracza
-    float otherX, otherY;
-    if (_networkManager->ReceivePosition(otherX, otherY)) {
-        _enemyCircle->setPosition(otherX, otherY);
+    if (_networkManager->IsServer()) {
+        // Serwer steruje enemyCircle, a klient playerCircle
+        _enemyCircle->move(movement);
+        _networkManager->SendPosition(_enemyCircle->getPosition().x, _enemyCircle->getPosition().y);
+    
+        float otherX, otherY;
+        if (_networkManager->ReceivePosition(otherX, otherY)) {
+            _playerCircle->setPosition(otherX, otherY);
+        }
     } else {
-        std::cout << "Failed to receive position" << std::endl;
-        
+        // Klient steruje playerCircle, a serwer enemyCircle
+        _playerCircle->move(movement);
+        _networkManager->SendPosition(_playerCircle->getPosition().x, _playerCircle->getPosition().y);
+    
+        float otherX, otherY;
+        if (_networkManager->ReceivePosition(otherX, otherY)) {
+            _enemyCircle->setPosition(otherX, otherY);
+        }
     }
+    
 
 }
 
