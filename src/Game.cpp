@@ -1,5 +1,6 @@
 #include "Game.h"
 #include "MenuState.h"
+#include "GameplayState.h"
 
 Game::Game(int width, int height, std::string title) {
     _data->windowedWidth = width;
@@ -13,7 +14,8 @@ Game::Game(int width, int height, std::string title) {
     sf::View view(sf::FloatRect(0, 0, width, height));
     _data->window.setView(view);
 
-    _data->stateManager.AddState(StateRef(new MenuState(this->_data)));
+    // _data->stateManager.AddState(StateRef(new MenuState(this->_data)));
+    _data->stateManager.AddState(StateRef(new GameplayState(this->_data)));
     this->Run();
 }
 
