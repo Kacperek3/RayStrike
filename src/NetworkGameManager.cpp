@@ -1,65 +1,117 @@
-
 #include <fcntl.h>
 #include <thread>
 #include <chrono>
+#include <sys/select.h>
 #include "NetworkGameManager.h"
 
 NetworkGameManager::NetworkGameManager(bool isServer, const std::string& ip, int port) 
     : _isServer(isServer), _isRunning(true) {
     
+    if(_isServer) {
+        SetupServer(port);
+    } else {
+        SetupClient(ip, port);
+    }
+
+    if(_connected) {
+        _receiverThread = std::thread(&NetworkGameManager::ReceiveLoop, this);
+    }
+}
+
+void NetworkGameManager::SetupServer(int port) {
     _socket = socket(AF_INET, SOCK_STREAM, 0);
     if (_socket == -1) {
-        std::cerr << "Error creating socket: " << strerror(errno) << std::endl;
+        std::cerr << "Server socket error: " << strerror(errno) << std::endl;
         return;
     }
 
-    // Ustaw gniazdo jako nieblokujące
-    int flags = fcntl(_socket, F_GETFL, 0);
-    fcntl(_socket, F_SETFL, flags | O_NONBLOCK);
+    sockaddr_in hint{};
+    hint.sin_family = AF_INET;
+    hint.sin_port = htons(port);
+    hint.sin_addr.s_addr = INADDR_ANY;
+
+    if (bind(_socket, (sockaddr*)&hint, sizeof(hint)) < 0) {
+        std::cerr << "Bind failed: " << strerror(errno) << std::endl;
+        close(_socket);
+        return;
+    }
+
+    listen(_socket, SOMAXCONN);
+    
+    // Non-blocking accept
+    fcntl(_socket, F_SETFL, O_NONBLOCK);
+    
+    // Wait for connection in separate thread
+    std::thread([this](){
+        sockaddr_in client{};
+        socklen_t clientSize = sizeof(client);
+        
+        while(_isRunning && !_connected) {
+            _clientSocket = accept(_socket, (sockaddr*)&client, &clientSize);
+            if(_clientSocket > 0) {
+                fcntl(_clientSocket, F_SETFL, O_NONBLOCK);
+                _connected = true;
+                std::cout << "Client connected!\n";
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    }).detach();
+}
+
+void NetworkGameManager::SetupClient(const std::string& ip, int port) {
+    _socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (_socket == -1) {
+        std::cerr << "Client socket error: " << strerror(errno) << std::endl;
+        return;
+    }
 
     sockaddr_in hint{};
     hint.sin_family = AF_INET;
     hint.sin_port = htons(port);
     inet_pton(AF_INET, ip.c_str(), &hint.sin_addr);
 
-   // NetworkGameManager.cpp - poprawiona sekcja connect
-    if (!_isServer) {
-        if (connect(_socket, (sockaddr*)&hint, sizeof(hint)) < 0) {
-            if (errno != EINPROGRESS) { // Tylko dla non-blocking socket
-                std::cerr << "Connect failed: " << strerror(errno) << std::endl;
-                close(_socket);
-                return;
-            }
-            
-            // Czekaj na zakończenie połączenia (ważne dla non-blocking)
-            fd_set set;
-            FD_ZERO(&set);
-            FD_SET(_socket, &set);
-            timeval timeout{5, 0}; // 5 sekund timeout
-            if (select(_socket + 1, nullptr, &set, nullptr, &timeout) <= 0) {
-                std::cerr << "Connection timeout" << std::endl;
-                close(_socket);
-                return;
-            }
+    // Non-blocking connect
+    fcntl(_socket, F_SETFL, O_NONBLOCK);
+    
+    if (connect(_socket, (sockaddr*)&hint, sizeof(hint)) < 0) {
+        if(errno != EINPROGRESS) {
+            std::cerr << "Connect error: " << strerror(errno) << std::endl;
+            return;
         }
     }
 
-    _receiverThread = std::thread(&NetworkGameManager::ReceiveLoop, this);
+    // Wait for connection
+    fd_set set;
+    FD_ZERO(&set);
+    FD_SET(_socket, &set);
+    timeval timeout{5, 0};
+    
+    if(select(_socket + 1, nullptr, &set, nullptr, &timeout) > 0) {
+        int so_error;
+        socklen_t len = sizeof(so_error);
+        getsockopt(_socket, SOL_SOCKET, SO_ERROR, &so_error, &len);
+        
+        if(so_error == 0) {
+            _connected = true;
+            std::cout << "Connected to server!\n";
+        }
+    }
 }
 
 NetworkGameManager::~NetworkGameManager() {
     _isRunning = false;
-    if (_receiverThread.joinable()) {
+    if(_receiverThread.joinable()) {
         _receiverThread.join();
     }
     close(_socket);
-    if (_isServer) {
+    if(_isServer && _clientSocket != -1) {
         close(_clientSocket);
     }
 }
 
 void NetworkGameManager::ReceiveLoop() {
-    while (_isRunning) {
+    while (_isRunning && _connected) {
         float x, y;
         if (ReceivePosition(x, y)) {
             std::lock_guard<std::mutex> lock(_dataMutex);
@@ -72,49 +124,44 @@ void NetworkGameManager::ReceiveLoop() {
 
 bool NetworkGameManager::ReceivePosition(float& x, float& y) {
     int currentSocket = _isServer ? _clientSocket : _socket;
+    if(currentSocket <= 0) return false;
+
     float data[2]{};
-    
     int bytesReceived = recv(currentSocket, data, sizeof(data), 0);
-    if (bytesReceived == sizeof(data)) {
+    
+    if(bytesReceived == sizeof(data)) {
         x = data[0];
         y = data[1];
         return true;
-    } else if (bytesReceived == -1) {
-        if (errno == EWOULDBLOCK || errno == EAGAIN) {
-            return false;
-        } else {
-            std::cerr << "Recv error: " << strerror(errno) << std::endl;
-            return false;
-        }
-    } else if (bytesReceived == 0) {
-        std::cerr << "Connection closed" << std::endl;
-        return false;
     }
+    
+    if(bytesReceived == 0) {
+        std::cerr << "Connection closed\n";
+        _connected = false;
+    }
+    
     return false;
+}
+
+void NetworkGameManager::SendPosition(float x, float y) {
+    if(!_connected) return;
+
+    int currentSocket = _isServer ? _clientSocket : _socket;
+    if(currentSocket <= 0) return;
+
+    float data[2] = {x, y};
+    int result = send(currentSocket, data, sizeof(data), MSG_NOSIGNAL);
+    
+    if(result == -1) {
+        if(errno == EPIPE) {
+            std::cerr << "Connection closed by peer\n";
+            _connected = false;
+        }
+    }
 }
 
 void NetworkGameManager::GetEnemyPosition(float& x, float& y) {
     std::lock_guard<std::mutex> lock(_dataMutex);
     x = _enemyX;
     y = _enemyY;
-}
-// NetworkGameManager.cpp
-void NetworkGameManager::SendPosition(float x, float y) {
-    int currentSocket = _isServer ? _clientSocket : _socket;
-    
-    if (currentSocket <= 0) {
-        std::cerr << "Invalid socket descriptor!" << std::endl;
-        return;
-    }
-
-    float data[2] = {x, y};
-    int result = send(currentSocket, data, sizeof(data), MSG_NOSIGNAL);
-    
-    if (result == -1) {
-        if (errno == EPIPE) {
-            std::cerr << "Connection closed by peer" << std::endl;
-        } else {
-            std::cerr << "Send error: " << strerror(errno) << std::endl;
-        }
-    }
 }

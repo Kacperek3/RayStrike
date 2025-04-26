@@ -100,15 +100,16 @@ void GameplayState::Update() {
     }
 
 
-   float otherX, otherY;
-    _networkManager->GetEnemyPosition(otherX, otherY);
-    _enemyCircle->setPosition(otherX, otherY);
-
-    // Wyślij pozycję gracza
-    _networkManager->SendPosition(
-        _playerCircle->getPosition().x,
-        _playerCircle->getPosition().y
-    );
+   if(_networkManager->IsConnected()) {
+        float otherX, otherY;
+        _networkManager->GetEnemyPosition(otherX, otherY);
+        _enemyCircle->setPosition(otherX, otherY);
+        
+        _networkManager->SendPosition(
+            _playerCircle->getPosition().x,
+            _playerCircle->getPosition().y
+        );
+    }
     
 
 }
