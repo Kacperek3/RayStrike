@@ -27,7 +27,7 @@ private:
     float _enemyX = 0.0f;
     float _enemyY = 0.0f;
     bool _isRunning;
-    bool _connected = false;
+    bool _connected;
 
     void ReceiveLoop();
     bool ReceivePosition(float& x, float& y);

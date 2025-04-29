@@ -111,7 +111,9 @@ NetworkGameManager::~NetworkGameManager() {
 }
 
 void NetworkGameManager::ReceiveLoop() {
+    std::cout << "Receiver thread started\n";
     while (_isRunning && _connected) {
+        std::cout << "Receiving position...\n";
         float x, y;
         if (ReceivePosition(x, y)) {
             std::lock_guard<std::mutex> lock(_dataMutex);
@@ -126,21 +128,38 @@ bool NetworkGameManager::ReceivePosition(float& x, float& y) {
     int currentSocket = _isServer ? _clientSocket : _socket;
     if(currentSocket <= 0) return false;
 
-    float data[2]{};
-    int bytesReceived = recv(currentSocket, data, sizeof(data), 0);
-    
-    if(bytesReceived == sizeof(data)) {
-        x = data[0];
-        y = data[1];
-        return true;
+    static char buffer[8]; // Bufor na 8 bajtów (2 float)
+    static int received = 0; // Liczba odebranych bajtów
+
+    // Kontynuuj odbieranie do czasu zebrania pełnych danych
+    while (received < sizeof(buffer)) {
+        int bytesReceived = recv(currentSocket, buffer + received, sizeof(buffer) - received, 0);
+        
+        if (bytesReceived > 0) {
+            received += bytesReceived;
+        } else if (bytesReceived == 0) {
+            std::cerr << "Connection closed\n";
+            _connected = false;
+            received = 0;
+            return false;
+        } else {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // Brak danych do odczytu - wyjdź i spróbuj ponownie później
+                return false;
+            } else {
+                std::cerr << "recv error: " << strerror(errno) << std::endl;
+                _connected = false;
+                received = 0;
+                return false;
+            }
+        }
     }
-    
-    if(bytesReceived == 0) {
-        std::cerr << "Connection closed\n";
-        _connected = false;
-    }
-    
-    return false;
+
+    // Pełne dane odebrane - aktualizuj pozycję
+    memcpy(&x, buffer, sizeof(float));
+    memcpy(&y, buffer + sizeof(float), sizeof(float));
+    received = 0; // Reset bufora
+    return true;
 }
 
 void NetworkGameManager::SendPosition(float x, float y) {
