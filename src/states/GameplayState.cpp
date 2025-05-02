@@ -5,7 +5,7 @@ GameplayState::GameplayState(GameDataRef data) : _data(data) {
     _titleText = new sf::Text();
     _playerCircle = new sf::CircleShape();
     _enemyCircle = new sf::CircleShape();
-    _networkManager = new NetworkGameManager(true, "192.168.55.109", 54000);
+    _networkManager = new NetworkGameManager(false, "192.168.1.5", 54000);
 
     _clock = new sf::Clock();
 }

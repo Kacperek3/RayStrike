@@ -12,10 +12,6 @@ NetworkGameManager::NetworkGameManager(bool isServer, const std::string& ip, int
     } else {
         SetupClient(ip, port);
     }
-
-    if(_connected) {
-        _receiverThread = std::thread(&NetworkGameManager::ReceiveLoop, this);
-    }
 }
 
 void NetworkGameManager::SetupServer(int port) {
@@ -52,6 +48,9 @@ void NetworkGameManager::SetupServer(int port) {
                 fcntl(_clientSocket, F_SETFL, O_NONBLOCK);
                 _connected = true;
                 std::cout << "Client connected!\n";
+
+
+                _receiverThread = std::thread(&NetworkGameManager::ReceiveLoop, this);
                 break;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -94,6 +93,7 @@ void NetworkGameManager::SetupClient(const std::string& ip, int port) {
         
         if(so_error == 0) {
             _connected = true;
+            _receiverThread = std::thread(&NetworkGameManager::ReceiveLoop, this);
             std::cout << "Connected to server!\n";
         }
     }
