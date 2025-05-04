@@ -29,6 +29,7 @@ public:
 private:
     void ReceiveThreadFunc();
 
+    std::string _receiveBuffer;
     int _socketServerForClient;
     int _socketClient;
     std::atomic<bool> _running{false};

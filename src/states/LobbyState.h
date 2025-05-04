@@ -8,6 +8,7 @@
 
 #include "NetworkLobbyManager.h"
 #include "LobbyConfig.h"
+#include "GameConfig.h"
 #include "Tesseract.h"
 
 
@@ -39,6 +40,7 @@ private:
 
 
     LobbyConfig _config;
+    GameSettings _gameSettings;
 
     GameDataRef _data;
     AnimationState _animationState = AnimationState::ENTERING;
@@ -48,6 +50,10 @@ private:
     sf::Font _font;
     sf::Sprite *_backgroundTexture;
     sf::Sprite *_hostIcon;
+    sf::Sprite *_plusNumOfRoundsIcon;
+    sf::Sprite *_minusNumOfRoundsIcon;
+    sf::Sprite *_plusTimeLimitIcon;
+    sf::Sprite *_minusTimeLimitIcon;
 
 
     sf::Sprite *_clientIcon;
@@ -58,9 +64,6 @@ private:
     sf::RectangleShape *_spacer;
     sf::Text *_tittlePlayerList;
 
-    sf::RectangleShape *_backButton;
-    sf::Text *_backButtonText;
-
     sf::RectangleShape *_backgroundForHostList;
     sf::Text *_hostNameText;
     sf::Text *_hostHintText;
@@ -69,12 +72,29 @@ private:
     sf::Text *_clientNameText;
     sf::Text *_clientHintText;
 
+
+    sf::RectangleShape *_backgroundInfoList;
+    sf::RectangleShape *_backgroundInfoListPanel;
+    sf::RectangleShape *_spacerInfoList;
+    sf::Text *_tittleInfoList;
+
+    sf::RectangleShape *_backgroundForNumberOfRounds;
+    sf::Text *_numberOfRoundsText;
+    sf::RectangleShape *_backgroundForTimeLimit;
+    sf::Text *_timeLimitText;
+
+    sf::RectangleShape *_startGameButton;
+    sf::Text *_startGameButtonText;
+    sf::RectangleShape *_configureButton;
+    sf::Text *_configureButtonText;
+    sf::RectangleShape *_backButton;
+    sf::Text *_backButtonText;
+
+    
     Tesseract *_tesseract;
     
 
     const float _exitAnimationSpeed = 80.0f;
-
-    
 
 
     // network

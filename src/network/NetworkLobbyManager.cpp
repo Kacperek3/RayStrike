@@ -24,13 +24,14 @@ void NetworkLobbyManager::StartListening() {
 
 void NetworkLobbyManager::ReceiveThreadFunc() {
     int activeSocket = _isServer ? _socketServerForClient : _socketClient;
-    
+    _receiveBuffer.clear();
+
     while (_running) {
         fd_set readSet;
         FD_ZERO(&readSet);
         FD_SET(activeSocket, &readSet);
 
-        timeval timeout{0, 100000}; // 100ms timeout
+        timeval timeout{0, 100000};
 
         int result = select(activeSocket + 1, &readSet, nullptr, nullptr, &timeout);
         
@@ -40,9 +41,21 @@ void NetworkLobbyManager::ReceiveThreadFunc() {
 
             if (received > 0) {
                 buffer[received] = '\0';
-                std::lock_guard<std::mutex> lock(_queueMutex);
-                _messageQueue.push(std::string(buffer));
-                _cv.notify_one();
+                _receiveBuffer += buffer;
+
+                size_t pos;
+                while ((pos = _receiveBuffer.find('\n')) != std::string::npos) {
+                    std::string msg = _receiveBuffer.substr(0, pos);
+                    _receiveBuffer.erase(0, pos + 1);
+
+                    {
+                        std::lock_guard<std::mutex> lock(_queueMutex);
+                        if (!msg.empty()) {
+                            _messageQueue.push(msg);
+                            _cv.notify_one();
+                        }
+                    }
+                }
             }
             else if (received == 0 || (received == -1 && errno != EAGAIN)) {
                 {
