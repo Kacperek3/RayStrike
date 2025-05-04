@@ -3,6 +3,12 @@
 #include "GameplayState.h"
 #include "LobbyState.h"
 
+
+// for test 
+#include "LobbyConfig.h"
+//
+
+
 Game::Game(int width, int height, std::string title) {
     _data->windowedWidth = width;
     _data->windowedHeight = height;
@@ -19,7 +25,16 @@ Game::Game(int width, int height, std::string title) {
     //_data->stateManager.AddState(StateRef(new GameplayState(this->_data)));
     _data->stateManager.AddState(StateRef(new MenuState(this->_data)));
 
-    //_data->stateManager.AddState(StateRef(new LobbyState(this->_data,-1,-1)));
+
+    LobbyConfig lobbyConfig;
+    lobbyConfig.data = this->_data;
+    lobbyConfig.serverSocketForClient = -1;
+    lobbyConfig.clientSocket = -1;
+    lobbyConfig.hostName = "Player 1";
+    lobbyConfig.clientName = "Player 2";
+    lobbyConfig.isHost = true;
+
+    //_data->stateManager.AddState(StateRef(new LobbyState(lobbyConfig)), true);
     
     this->Run();
 }

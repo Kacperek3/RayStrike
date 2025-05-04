@@ -58,6 +58,7 @@ void CreateLobbyState::Init(){
 
     _tesseract->setPosition(sf::Vector2f(620, 400));
     _tesseract->setScale(3.0f);
+    _tesseract->setColor(sf::Color(255, 255, 255, 40));
  
 
     auto storeButtonData = [&](sf::RectangleShape* btn, sf::Text* txt) {

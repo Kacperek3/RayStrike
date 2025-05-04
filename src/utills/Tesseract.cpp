@@ -30,11 +30,11 @@ void Tesseract::draw(sf::RenderWindow& window) {
         projected.push_back(project4DTo2D(v));
     }
 
-    sf::Color lineColor = sf::Color(255, 255, 255, 40);
+    //sf::Color lineColor = sf::Color(255, 255, 255, 40);
     for(auto& edge : edges) {
         sf::Vertex line[] = {
-            sf::Vertex(projected[edge.first], lineColor),
-            sf::Vertex(projected[edge.second], lineColor)
+            sf::Vertex(projected[edge.first], this->color),
+            sf::Vertex(projected[edge.second],this->color)
         };
         window.draw(line, 2, sf::Lines);
     }
@@ -80,4 +80,7 @@ void Tesseract::setPosition(const sf::Vector2f& position) {
 
 void Tesseract::setScale(float scale) {
     this->scale = scale;
+}
+void Tesseract::setColor(const sf::Color& color) {
+    this->color = color;
 }

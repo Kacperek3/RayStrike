@@ -17,6 +17,7 @@ public:
     void draw(sf::RenderWindow& window);
     void setPosition(const sf::Vector2f& position);
     void setScale(float scale);
+    void setColor(const sf::Color& color);
 
 private:
     std::vector<Vector4D> vertices;
@@ -25,6 +26,7 @@ private:
     float angleYW;
     sf::Vector2f position;
     float scale;
+    sf::Color color;
     
     sf::Vector2f project4DTo2D(const Vector4D& v);
 };

@@ -8,6 +8,7 @@
 
 #include "NetworkLobbyManager.h"
 #include "LobbyConfig.h"
+#include "Tesseract.h"
 
 
 
@@ -46,7 +47,10 @@ private:
 
     sf::Font _font;
     sf::Sprite *_backgroundTexture;
-    sf::Sprite *_crownIcon;
+    sf::Sprite *_hostIcon;
+
+
+    sf::Sprite *_clientIcon;
     sf::Text *_titleText;
 
     sf::RectangleShape *_backgroundPlayerList;
@@ -56,6 +60,17 @@ private:
 
     sf::RectangleShape *_backButton;
     sf::Text *_backButtonText;
+
+    sf::RectangleShape *_backgroundForHostList;
+    sf::Text *_hostNameText;
+    sf::Text *_hostHintText;
+
+    sf::RectangleShape *_backgroundForClientList;
+    sf::Text *_clientNameText;
+    sf::Text *_clientHintText;
+
+    Tesseract *_tesseract;
+    
 
     const float _exitAnimationSpeed = 80.0f;
 

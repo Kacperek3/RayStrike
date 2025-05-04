@@ -4,14 +4,25 @@ LobbyState::LobbyState(const LobbyConfig config) : _config(config), _data(config
     srand(static_cast<unsigned>(time(NULL)));
 
     _backgroundTexture = new sf::Sprite();
-    _crownIcon = new sf::Sprite();
+    _hostIcon = new sf::Sprite();
+    _clientIcon = new sf::Sprite();
 
     _backgroundPlayerList = new sf::RectangleShape();
     _backgroundPlayerListPanel = new sf::RectangleShape();
     _spacer = new sf::RectangleShape();
     _tittlePlayerList = new sf::Text();
 
+    _backgroundForHostList = new sf::RectangleShape();
+    _hostNameText = new sf::Text();
+    _hostHintText = new sf::Text();
+
+    _backgroundForClientList = new sf::RectangleShape();
+    _clientNameText = new sf::Text();
+    _clientHintText = new sf::Text();
+
     _titleText = new sf::Text();
+
+    _tesseract = new Tesseract();
 
     _backButton = new sf::RectangleShape();
     _backButtonText = new sf::Text();
@@ -30,9 +41,14 @@ void LobbyState::Init(){
     _backgroundTexture->setTexture(_data->assetManager.GetTexture("background"));
     _backgroundTexture->setPosition(0, 0);
 
-    _data->assetManager.LoadTexture("crownIcon", "assets/crown.jpg");
-    _crownIcon->setTexture(_data->assetManager.GetTexture("crownIcon"));
-    _crownIcon->setPosition(1000, 60);
+    _data->assetManager.LoadTexture("crownIcon", "assets/hosticon.jpg");
+    _hostIcon->setTexture(_data->assetManager.GetTexture("crownIcon"));
+    _hostIcon->setPosition(790, 250);
+
+    _data->assetManager.LoadTexture("clientIcon", "assets/clientIcon.jpg");
+    _clientIcon->setTexture(_data->assetManager.GetTexture("clientIcon"));
+    _clientIcon->setPosition(790, 313);
+
 
     _backgroundPlayerList->setSize(sf::Vector2f(400, 450));
     _backgroundPlayerList->setFillColor(sf::Color(58, 58, 58, 200));
@@ -49,6 +65,33 @@ void LobbyState::Init(){
     _tittlePlayerList->setFillColor(sf::Color::White);
     _tittlePlayerList->setPosition(900, 188);
 
+    _backgroundForHostList->setSize(sf::Vector2f(400, 65));
+    _backgroundForHostList->setFillColor(sf::Color(115, 123, 146 , 150));
+    _backgroundForHostList->setPosition(780, 240);
+    _hostNameText->setFont(_font);
+    _hostNameText->setString(_config.hostName);
+    _hostNameText->setCharacterSize(19);
+    _hostNameText->setFillColor(sf::Color(255, 223, 0));
+    _hostNameText->setPosition(860, 258);
+    _hostHintText->setFont(_font);
+    _hostHintText->setString("Host");
+    _hostHintText->setCharacterSize(16);
+    _hostHintText->setFillColor(sf::Color(230, 230, 230,100));
+    _hostHintText->setPosition(1030, 258);
+
+    _backgroundForClientList->setSize(sf::Vector2f(400, 65));
+    _backgroundForClientList->setFillColor(sf::Color(115, 123, 146 , 150));
+    _backgroundForClientList->setPosition(780, 303);
+    _clientNameText->setFont(_font);
+    _clientNameText->setString(_config.clientName);
+    _clientNameText->setCharacterSize(19);
+    _clientNameText->setFillColor(sf::Color(230, 230, 230));
+    _clientNameText->setPosition(860, 321);
+    _clientHintText->setFont(_font);
+    _clientHintText->setString("Client");
+    _clientHintText->setCharacterSize(16);
+    _clientHintText->setFillColor(sf::Color(230, 230, 230,100));
+    _clientHintText->setPosition(1030, 321);
 
 
     _titleText->setFont(_font);
@@ -67,7 +110,9 @@ void LobbyState::Init(){
     _backButtonText->setFillColor(sf::Color::White);
     _backButtonText->setPosition(_backButton->getPosition().x + 70, _backButton->getPosition().y + 8);
 
-   
+    _tesseract->setPosition(sf::Vector2f(980, 270));
+    _tesseract->setScale(0.15f);
+    _tesseract->setColor(sf::Color(255, 223, 0,120));
 
     auto storeButtonData = [&](sf::RectangleShape* btn, sf::Text* txt) {
         sf::Vector2f originalBtnPos = btn->getPosition();
@@ -105,6 +150,7 @@ void LobbyState::HandleInput() {
 }
 
 void LobbyState::Update() {
+    _tesseract->update();
     // Animation logic
     if(_animationState == AnimationState::ENTERING) {
         enteringAnimation();
@@ -243,26 +289,45 @@ void LobbyState::Draw() {
     _data->window.draw(*_backgroundPlayerListPanel);
     _data->window.draw(*_spacer);
     _data->window.draw(*_tittlePlayerList);
+    _data->window.draw(*_backgroundForHostList);
+    _data->window.draw(*_hostNameText);
+    _data->window.draw(*_hostHintText);
+    _data->window.draw(*_backgroundForClientList);
+    _data->window.draw(*_clientNameText);
+    _data->window.draw(*_clientHintText);
+    _tesseract->draw(_data->window);
+
     _data->window.draw(*_titleText);
     _data->window.draw(*_backButton);
     _data->window.draw(*_backButtonText);
 
-    
+
+    _data->window.draw(*_hostIcon);
+    _data->window.draw(*_clientIcon);
     _data->window.display();
 }
 
 
 LobbyState::~LobbyState() {
     delete _backgroundTexture;
-    delete _crownIcon;
+    delete _hostIcon;
+    delete _clientIcon;
     delete _backgroundPlayerList;
     delete _backgroundPlayerListPanel;
     delete _spacer;
     delete _tittlePlayerList;
+    delete _backgroundForHostList;
+    delete _hostNameText;
+    delete _hostHintText;
+    delete _backgroundForClientList;
+    delete _clientNameText;
+    delete _clientHintText;
+    delete _tesseract;
     delete _titleText;
     delete _backButton;
     delete _backButtonText;
     delete _networkLobbyManager;
+
 }
 
 

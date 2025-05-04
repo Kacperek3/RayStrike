@@ -163,7 +163,7 @@ void JoinLobbyState::HandleInput() {
 
                         auto backgroundForOption = new sf::RectangleShape();
                         backgroundForOption->setSize(sf::Vector2f(950,65));
-                        backgroundForOption->setFillColor(sf::Color(  115, 123, 146   , 150));
+                        backgroundForOption->setFillColor(sf::Color(115, 123, 146 , 150));
                         backgroundForOption->setPosition(165, startY + i * spacing - 26);
                         _backgroundForOption.push_back(backgroundForOption);
                         
