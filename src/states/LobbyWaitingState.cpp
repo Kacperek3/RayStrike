@@ -74,10 +74,16 @@ void LobbyWaitingState::Init() {
     _networkManager.startLobbyBroadcast(message, 8888);
 
     // obsługa połączenia TCP
-    _networkManager.onClientConnected([this](std::string ip) {
-        _data->stateManager.AddState(StateRef(new LobbyState(_data)), true);
 
-        
+    _networkManager.onClientConnected([this](int serverSocketForClient) {
+        _lobbyConfig.data = _data;
+        _lobbyConfig.serverSocketForClient = serverSocketForClient;
+        _lobbyConfig.clientSocket = -1;
+        _lobbyConfig.hostName = _playerName;
+        _lobbyConfig.clientName = "Player 2";
+        //_config.clientName = ...; //! trzeba dodac w jakis ciekawy sposob nazwe klienta
+        _lobbyConfig.isHost = true;
+        _data->stateManager.AddState(StateRef(new LobbyState(_lobbyConfig)), true);
     });
 }
 

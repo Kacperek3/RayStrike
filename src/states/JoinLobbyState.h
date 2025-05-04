@@ -7,6 +7,7 @@
 #include <cmath>
 
 #include "NetworkManager.h"
+#include "LobbyConfig.h"
 
 
 
@@ -36,6 +37,7 @@ private:
     void standartAnimation();
 
 
+    LobbyConfig _lobbyConfig;
     GameDataRef _data;
     AnimationState _animationState = AnimationState::ENTERING;
 

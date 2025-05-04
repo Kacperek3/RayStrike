@@ -1,14 +1,22 @@
 #include "LobbyState.h"
 
-LobbyState::LobbyState(GameDataRef data) : _data(data) {
+LobbyState::LobbyState(const LobbyConfig config) : _config(config), _data(config.data) {
     srand(static_cast<unsigned>(time(NULL)));
 
     _backgroundTexture = new sf::Sprite();
+    _crownIcon = new sf::Sprite();
+
+    _backgroundPlayerList = new sf::RectangleShape();
+    _backgroundPlayerListPanel = new sf::RectangleShape();
+    _spacer = new sf::RectangleShape();
+    _tittlePlayerList = new sf::Text();
+
     _titleText = new sf::Text();
 
     _backButton = new sf::RectangleShape();
     _backButtonText = new sf::Text();
     
+    _networkLobbyManager = new NetworkLobbyManager(_config.serverSocketForClient, _config.clientSocket);
 }
 
 void LobbyState::Init(){
@@ -20,12 +28,34 @@ void LobbyState::Init(){
 
     _data->assetManager.LoadTexture("background", "assets/background.jpg");
     _backgroundTexture->setTexture(_data->assetManager.GetTexture("background"));
+    _backgroundTexture->setPosition(0, 0);
+
+    _data->assetManager.LoadTexture("crownIcon", "assets/crown.jpg");
+    _crownIcon->setTexture(_data->assetManager.GetTexture("crownIcon"));
+    _crownIcon->setPosition(1000, 60);
+
+    _backgroundPlayerList->setSize(sf::Vector2f(400, 450));
+    _backgroundPlayerList->setFillColor(sf::Color(58, 58, 58, 200));
+    _backgroundPlayerList->setPosition(780, 170);
+    _backgroundPlayerListPanel->setSize(sf::Vector2f(400, 65));
+    _backgroundPlayerListPanel->setFillColor(sf::Color(88, 88, 88, 200));
+    _backgroundPlayerListPanel->setPosition(780, 170);
+    _spacer->setSize(sf::Vector2f(400, 5));
+    _spacer->setFillColor(sf::Color(255, 255, 255, 200));
+    _spacer->setPosition(780, 235);
+    _tittlePlayerList->setFont(_font);
+    _tittlePlayerList->setString("Player List");
+    _tittlePlayerList->setCharacterSize(23);
+    _tittlePlayerList->setFillColor(sf::Color::White);
+    _tittlePlayerList->setPosition(900, 188);
+
+
 
     _titleText->setFont(_font);
     _titleText->setString("Lobby");
     _titleText->setCharacterSize(50);
     _titleText->setFillColor(sf::Color::White);
-    _titleText->setPosition(_data->window.getSize().x,100);
+    _titleText->setPosition(_data->window.getSize().x,60);
 
     _backButton->setSize(sf::Vector2f(250, 50));
     _backButton->setFillColor(sf::Color(80, 150, 255,150));
@@ -66,6 +96,7 @@ void LobbyState::HandleInput() {
                 sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
                 if (_backButton->getGlobalBounds().contains(mousePos)) {
                     _animationState = AnimationState::EXITING;
+                    _networkLobbyManager->Send("__DISCONNECT__");
                 }
             }
             return;
@@ -83,6 +114,16 @@ void LobbyState::Update() {
         standartAnimation();
     }
 
+    std::string msg;
+    while (_networkLobbyManager->WaitForMessage(msg, 0)) { // timeout 0 = nie blokuj
+        if (msg.find("__DISCONNECT") != std::string::npos) {
+            _animationState = AnimationState::EXITING;
+            break;
+        }
+    }
+
+
+    
 }
 
 
@@ -162,8 +203,8 @@ void LobbyState::enteringAnimation() {
 
     if (currentPos.x > 0) {
         currentPos.x -= _exitAnimationSpeed;
-        if (currentPos.x <= 450){
-            currentPos.x = 450;
+        if (currentPos.x <= 550){
+            currentPos.x = 550;
             _animationState = AnimationState::NONE;
         }
         
@@ -195,13 +236,14 @@ void LobbyState::standartAnimation(){
 }
 
 
-
-
 void LobbyState::Draw() {
     _data->window.clear();
     _data->window.draw(*_backgroundTexture);
+    _data->window.draw(*_backgroundPlayerList);
+    _data->window.draw(*_backgroundPlayerListPanel);
+    _data->window.draw(*_spacer);
+    _data->window.draw(*_tittlePlayerList);
     _data->window.draw(*_titleText);
-
     _data->window.draw(*_backButton);
     _data->window.draw(*_backButtonText);
 
@@ -212,9 +254,15 @@ void LobbyState::Draw() {
 
 LobbyState::~LobbyState() {
     delete _backgroundTexture;
+    delete _crownIcon;
+    delete _backgroundPlayerList;
+    delete _backgroundPlayerListPanel;
+    delete _spacer;
+    delete _tittlePlayerList;
     delete _titleText;
     delete _backButton;
     delete _backButtonText;
+    delete _networkLobbyManager;
 }
 
 

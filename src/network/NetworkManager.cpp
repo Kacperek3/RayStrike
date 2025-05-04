@@ -11,7 +11,7 @@ NetworkManager::~NetworkManager() {
     stopTCPListener();
 }
 
-void NetworkManager::startLobbyBroadcast(const std::string& message, int port) {
+void NetworkManager::startLobbyBroadcast(const std::string& message, int port) { // Server
     udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
     int enable = 1;
     setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST, &enable, sizeof(enable));
@@ -31,14 +31,14 @@ void NetworkManager::startLobbyBroadcast(const std::string& message, int port) {
     });
 }
 
-void NetworkManager::stopLobbyBroadcast() {
+void NetworkManager::stopLobbyBroadcast() { // Server
     broadcasting = false;
     if (broadcastThread.joinable()) broadcastThread.join();
     if (udpSocket != -1) close(udpSocket);
 }
 
-void NetworkManager::startTCPListener(int preferredPort) {
-   tcpSocket = socket(AF_INET, SOCK_STREAM, 0);
+void NetworkManager::startTCPListener(int preferredPort) { // Server
+    tcpSocket = socket(AF_INET, SOCK_STREAM, 0);
     memset(&tcpAddr, 0, sizeof(tcpAddr));
     tcpAddr.sin_family = AF_INET;
     tcpAddr.sin_addr.s_addr = INADDR_ANY;
@@ -64,8 +64,8 @@ void NetworkManager::startTCPListener(int preferredPort) {
             if (client >= 0) {
                 char ip[INET_ADDRSTRLEN];
                 inet_ntop(AF_INET, &clientAddr.sin_addr, ip, INET_ADDRSTRLEN);
-                if (clientConnectedCallback) clientConnectedCallback(ip);
-                close(client);
+                if (clientConnectedCallback) clientConnectedCallback(client);
+                //close(client);
             } else {
                 if (errno != EAGAIN && errno != EWOULDBLOCK) {
                     perror("accept error");
@@ -74,9 +74,10 @@ void NetworkManager::startTCPListener(int preferredPort) {
             }
         }
     });
+    
 }
 
-void NetworkManager::stopTCPListener() {
+void NetworkManager::stopTCPListener() { // Server
     listening = false;
 
     if (listenerThread.joinable() && std::this_thread::get_id() != listenerThread.get_id()) {
@@ -94,18 +95,18 @@ void NetworkManager::stopTCPListener() {
 
 }
 
-int NetworkManager::getTCPPort() const {
+int NetworkManager::getTCPPort() const { // Server
     socklen_t len = sizeof(tcpAddr);
     getsockname(tcpSocket, (sockaddr*)&tcpAddr, &len);
     return ntohs(tcpAddr.sin_port);
 }
 
-void NetworkManager::onClientConnected(std::function<void(std::string)> callback) {
+void NetworkManager::onClientConnected(std::function<void(int)> callback) { // Server
     clientConnectedCallback = callback;
 }
 
 
-void NetworkManager::startLobbyDiscovery(int port) {
+void NetworkManager::startLobbyDiscovery(int port) { // Client
     discoverySocket = socket(AF_INET, SOCK_DGRAM, 0);
     int enable = 1;
     setsockopt(discoverySocket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
@@ -165,7 +166,6 @@ void NetworkManager::startLobbyDiscovery(int port) {
                 }
             }
             
-            // Czyszczenie starych wpisów (CO 1 SEKUNDĘ)
             auto now = time(nullptr);
             std::lock_guard<std::mutex> lock(lobbyMutex);
             for(auto it = discoveredLobbies.begin(); it != discoveredLobbies.end();) {
@@ -180,17 +180,19 @@ void NetworkManager::startLobbyDiscovery(int port) {
     });
 }
 
-void NetworkManager::stopLobbyDiscovery() {
+void NetworkManager::stopLobbyDiscovery() { // Client
     discovering = false;
+    discoveredLobbies.clear();
     if(discoveryThread.joinable()) discoveryThread.join();
 }
 
-std::unordered_map<std::string, LobbyInfo> NetworkManager::getDiscoveredLobbies() {
+
+std::unordered_map<std::string, LobbyInfo> NetworkManager::getDiscoveredLobbies() { // Client
     std::lock_guard<std::mutex> lock(lobbyMutex);
     return discoveredLobbies;
 }
 
-bool NetworkManager::connectToServer(const std::string& ip, int port) {
+bool NetworkManager::connectToServer(const std::string& ip, int port) { // Client
     clientSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (clientSocket < 0) {
         perror("socket");
@@ -216,6 +218,6 @@ bool NetworkManager::connectToServer(const std::string& ip, int port) {
     return true;
 }
 
-int NetworkManager::getClientSocket() const {
+int NetworkManager::getClientSocket() const { // Client
     return clientSocket;
 }

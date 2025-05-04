@@ -12,6 +12,7 @@
 #include "LabeledTextField.h"
 #include "Tesseract.h"
 #include "NetworkManager.h"
+#include "LobbyConfig.h"
 
 class LobbyWaitingState : public State {
 public:
@@ -39,6 +40,8 @@ private:
     AnimationState _animationState = AnimationState::ENTERING;
     std::unordered_map<sf::RectangleShape*, std::tuple<sf::Vector2f, sf::Vector2f, sf::FloatRect, sf::Color>> _buttonData;
 
+
+    LobbyConfig _lobbyConfig;
     GameDataRef _data;
     std::string _lobbyName;
     std::string _playerName;

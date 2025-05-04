@@ -175,7 +175,17 @@ void JoinLobbyState::HandleInput() {
                             LobbyInfo lobby = _currentLobbies[i];
                             
                             if(_networkManager.connectToServer(lobby.ip, lobby.port)) {
-                                _data->stateManager.AddState(StateRef(new LobbyState(_data)), false);
+                                _networkManager.stopLobbyDiscovery();
+                                _lobbyConfig.data = _data;
+                                _lobbyConfig.serverSocketForClient = -1;
+                                _lobbyConfig.clientSocket = _networkManager.getClientSocket();
+                                _lobbyConfig.hostName = lobby.playerName;
+                                _lobbyConfig.clientName = "Player 2";
+                                //_config.clientName = lobby.playerName; //! trzeba dodac w jakis ciekawy sposob nazwe klienta
+                                _lobbyConfig.isHost = false;
+                                _data->stateManager.AddState(StateRef(new LobbyState(_lobbyConfig)), true); // !! pokminic jak
+                                //! usunac state aby przenioslo nas z powrotem do join lobby jednak by LobbyDiscovery sie nie zatrzymalo
+                                //! poki co przenosi nas do menu glownego 
                             }
                             else {
                                 std::cerr << "Failed to connect to server" << std::endl;

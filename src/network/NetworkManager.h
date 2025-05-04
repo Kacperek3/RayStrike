@@ -35,7 +35,7 @@ public:
 
     int getTCPPort() const;
 
-    void onClientConnected(std::function<void(std::string)> callback);
+    void onClientConnected(std::function<void(int)> callback);
 
 
     void startLobbyDiscovery(int port = 8888);
@@ -47,8 +47,9 @@ public:
 
 
 private:
-    int udpSocket;
-    int tcpSocket;
+    int udpSocket; // Socket for UDP broadcast (server)
+    int tcpSocket; // Socket for TCP listener (server)
+    int tcpSocketClient; // Socket for TCP connection (server)
     sockaddr_in broadcastAddr;
     sockaddr_in tcpAddr;
 
@@ -58,14 +59,15 @@ private:
     std::thread broadcastThread;
     std::thread listenerThread;
 
-    std::function<void(std::string)> clientConnectedCallback;
+    std::function<void(int)> clientConnectedCallback;
 
 
-    int discoverySocket;
+    
     std::atomic<bool> discovering;
     std::thread discoveryThread;
     std::unordered_map<std::string, LobbyInfo> discoveredLobbies;
     std::mutex lobbyMutex;
 
-    int clientSocket = -1;
+    int discoverySocket; // Socket for UDP discovery (client)
+    int clientSocket = -1; // Socket for TCP connection (client)
 };
