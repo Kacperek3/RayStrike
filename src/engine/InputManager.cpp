@@ -1,4 +1,5 @@
 #include "InputManager.h"
+#include <cmath>
 
 
 bool InputManager::IsSpriteClicked(sf::Sprite object, sf::Mouse::Button button, sf::RenderWindow &window) {
@@ -58,42 +59,32 @@ bool InputManager::IsSpriteHover(sf::Sprite object, sf::RenderWindow &window) {
     }
     return false;
 }
-bool InputManager::IsSpriteHoverAccurate(sf::Sprite object, sf::Mouse::Button button, sf::RenderWindow &window) {
-   
+bool InputManager::IsSpriteHoverAccurate(sf::Sprite object,
+                                       sf::RenderWindow &window,
+                                       float detectionRadius) 
+{
     sf::Vector2f mouseWorldPos = GetMousePosition(window);
-
-    // Zamiana pozycji myszy na współrzędne tekstury sprite'a
     sf::FloatRect bounds = object.getGlobalBounds();
-    sf::Vector2f spritePosition = object.getPosition();
 
-    // Sprawdzenie, czy kliknięcie znajduje się w globalnych granicach sprite'a
-    if (bounds.contains(mouseWorldPos)) {
-        // Pobranie tekstury i pikseli
-        const sf::Texture* texture = object.getTexture();
-        if (texture) {
-            // Pobranie obrazu tekstury (musi być załadowana wcześniej jako `sf::Image`)
-            sf::Image image = texture->copyToImage();
-
-            // Pozycja piksela w teksturze (z uwzględnieniem skali i przesunięcia)
-            sf::Vector2f localPos = mouseWorldPos - spritePosition;
-            sf::Vector2f scaledPos(localPos.x / object.getScale().x, localPos.y / object.getScale().y);
-
-            // Upewnienie się, że piksel jest w granicach tekstury
-            if (scaledPos.x >= 0 && scaledPos.y >= 0 &&
-                scaledPos.x < image.getSize().x && scaledPos.y < image.getSize().y) {
-
-                // Pobranie piksela w odpowiednich współrzędnych
-                sf::Color pixelColor = image.getPixel(static_cast<unsigned int>(scaledPos.x),
-                                                        static_cast<unsigned int>(scaledPos.y));
-
-                // Sprawdzenie, czy piksel nie jest przezroczysty
-                if (pixelColor.a != 0) {
-                    return true;
-                }
-            }
-        }
+    // Sprawdzenie czy mysz jest w globalnych granicach
+    if (bounds.contains(mouseWorldPos)) 
+    {
+        // Transformacja pozycji myszy do lokalnych współrzędnych sprite'a
+        sf::Vector2f localMousePos = object.getInverseTransform().transformPoint(mouseWorldPos);
+        
+        // Pobranie rozmiarów tekstury
+        const sf::Vector2u textureSize = object.getTexture()->getSize();
+        
+        // Obliczenie środka tekstury
+        const sf::Vector2f textureCenter(textureSize.x / 2.0f, textureSize.y / 2.0f);
+        
+        // Obliczenie odległości od środka tekstury
+        const float distanceX = localMousePos.x - textureCenter.x;
+        const float distanceY = localMousePos.y - textureCenter.y;
+        
+        // Sprawdzenie czy mysz jest w zasięgu wykrywania
+        return (std::hypot(distanceX, distanceY) <= detectionRadius);
     }
-
     return false;
 }
 

@@ -10,6 +10,7 @@
 #include "LobbyConfig.h"
 #include "GameConfig.h"
 #include "Tesseract.h"
+#include "TextField.h"
 
 
 
@@ -89,6 +90,13 @@ private:
     sf::Text *_configureButtonText;
     sf::RectangleShape *_backButton;
     sf::Text *_backButtonText;
+    //chat
+    sf::RectangleShape *_spacerToChat;
+    sf::Text *_tittleToChatText;
+    TextField *_chatTextField;
+    sf::Sprite *_sendMessageIcon;
+    std::vector<sf::Text*> _chatMessages;
+
 
     
     Tesseract *_tesseract;

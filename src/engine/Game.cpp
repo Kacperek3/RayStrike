@@ -23,18 +23,18 @@ Game::Game(int width, int height, std::string title) {
 
     
     //_data->stateManager.AddState(StateRef(new GameplayState(this->_data)));
-    _data->stateManager.AddState(StateRef(new MenuState(this->_data)));
+    //_data->stateManager.AddState(StateRef(new MenuState(this->_data)));
 
 
-    // LobbyConfig lobbyConfig;
-    // lobbyConfig.data = this->_data;
-    // lobbyConfig.serverSocketForClient = -1;
-    // lobbyConfig.clientSocket = -1;
-    // lobbyConfig.hostName = "Player 1";
-    // lobbyConfig.clientName = "Player 2";
-    // lobbyConfig.isHost = true;
+    LobbyConfig lobbyConfig;
+    lobbyConfig.data = this->_data;
+    lobbyConfig.serverSocketForClient = -1;
+    lobbyConfig.clientSocket = -1;
+    lobbyConfig.hostName = "Player 1";
+    lobbyConfig.clientName = "Player 2";
+    lobbyConfig.isHost = true;
 
-    // _data->stateManager.AddState(StateRef(new LobbyState(lobbyConfig)), true);
+    _data->stateManager.AddState(StateRef(new LobbyState(lobbyConfig)), true);
     
     this->Run();
 }

@@ -10,7 +10,7 @@ LobbyState::LobbyState(const LobbyConfig config) : _config(config), _data(config
     _minusNumOfRoundsIcon = new sf::Sprite();
     _plusTimeLimitIcon = new sf::Sprite();
     _minusTimeLimitIcon = new sf::Sprite();
-
+    _sendMessageIcon = new sf::Sprite();
 
     _backgroundPlayerList = new sf::RectangleShape();
     _backgroundPlayerListPanel = new sf::RectangleShape();
@@ -34,6 +34,10 @@ LobbyState::LobbyState(const LobbyConfig config) : _config(config), _data(config
     _backgroundForTimeLimit = new sf::RectangleShape();
     _numberOfRoundsText = new sf::Text();
     _timeLimitText = new sf::Text();
+
+
+    _spacerToChat = new sf::RectangleShape();
+    _tittleToChatText = new sf::Text();
 
 
     _titleText = new sf::Text();
@@ -77,7 +81,7 @@ void LobbyState::Init(){
     _minusNumOfRoundsIcon->setTexture(_data->assetManager.GetTexture("minusIcon"));
     _minusNumOfRoundsIcon->setPosition(180, 570);
 
-    _data->assetManager.LoadTexture("plusIcon", "assets/flair_plus.png");
+    _data->assetManager.LoadTexture("plusIconHover", "assets/flair_plus_hover.png");
     _plusTimeLimitIcon->setTexture(_data->assetManager.GetTexture("plusIcon"));
     _plusTimeLimitIcon->setPosition(580, 633);
     _data->assetManager.LoadTexture("minusIcon", "assets/flair_minus.png");
@@ -126,6 +130,25 @@ void LobbyState::Init(){
     _clientHintText->setCharacterSize(16);
     _clientHintText->setFillColor(sf::Color(230, 230, 230,100));
     _clientHintText->setPosition(1030, 321);
+
+
+    _spacerToChat->setSize(sf::Vector2f(400, 3));
+    _spacerToChat->setFillColor(sf::Color(255, 255, 255, 150));
+    _spacerToChat->setPosition(780, 368);
+    _tittleToChatText->setFont(_font);
+    _tittleToChatText->setString("Chat");
+    _tittleToChatText->setCharacterSize(23);
+    _tittleToChatText->setFillColor(sf::Color(255, 255, 255, 120));
+    _tittleToChatText->setPosition(950, 380);
+    _chatTextField = new TextField(784, 770, 392, 46, _font);
+    _chatTextField->setColor(sf::Color(58, 58, 58, 200));
+    _chatTextField->setOutlineColor(sf::Color(230, 230, 230, 50));
+    _chatTextField->setTextColor(sf::Color(255, 255, 255, 200));
+    _data->assetManager.LoadTexture("sendIcon", "assets/flair_arrows_right.png");
+    _data->assetManager.LoadTexture("sendIconHover", "assets/flair_arrows_right_hover.png");
+    _sendMessageIcon->setTexture(_data->assetManager.GetTexture("sendIcon"));
+    _sendMessageIcon->setPosition(1100, 760);
+
 
 
     _backgroundInfoList->setSize(sf::Vector2f(500, 320));
@@ -221,6 +244,7 @@ void LobbyState::Init(){
 void LobbyState::HandleInput() {
     sf::Event event;
     while (_data->window.pollEvent(event)) {
+        _chatTextField->handleEvent(event);
         if (event.type == sf::Event::Closed) {
             _data->window.close();
             return;
@@ -266,6 +290,13 @@ void LobbyState::HandleInput() {
                         _gameSettings.timeLimit-=5;
                         _timeLimitText->setString("Time limit: " + std::to_string(_gameSettings.timeLimit) + " sec");
                         _networkLobbyManager->Send("__TIME_LIMIT__" + std::to_string(_gameSettings.timeLimit));
+                    }
+                }
+                else if(_sendMessageIcon->getGlobalBounds().contains(mousePos)){
+                    std::string message = _chatTextField->getInput();
+                    if(!message.empty()){
+                        _networkLobbyManager->Send("__CHAT__" + message);
+                        _chatTextField->setInput("");
                     }
                 }
             }
@@ -388,6 +419,31 @@ void LobbyState::enteringAnimation() {
 
 void LobbyState::standartAnimation(){
     sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
+
+
+    if(_data->inputManager.IsSpriteHoverAccurate(*_plusNumOfRoundsIcon, _data->window,45)){
+        _plusNumOfRoundsIcon->setTexture(_data->assetManager.GetTexture("plusIconHover"));
+    }
+    else{
+        _plusNumOfRoundsIcon->setTexture(_data->assetManager.GetTexture("plusIcon"));
+    }
+    if(_data->inputManager.IsSpriteHoverAccurate(*_plusTimeLimitIcon, _data->window,45)){
+        _plusTimeLimitIcon->setTexture(_data->assetManager.GetTexture("plusIconHover"));
+    }
+    else{
+        _plusTimeLimitIcon->setTexture(_data->assetManager.GetTexture("plusIcon"));
+    }
+
+    if(_data->inputManager.IsSpriteHoverAccurate(*_sendMessageIcon, _data->window,20)){
+        _sendMessageIcon->setTexture(_data->assetManager.GetTexture("sendIconHover"));
+    }
+    else{
+        _sendMessageIcon->setTexture(_data->assetManager.GetTexture("sendIcon"));
+    }
+     
+
+
+
     const float hoverOffset = 10.f;
     const sf::Color hoverColor(0, 59, 190);
     for (auto& [button, data] : _buttonData) {
@@ -445,6 +501,10 @@ void LobbyState::Draw() {
     _data->window.draw(*_backButton);
     _data->window.draw(*_backButtonText);
 
+    _data->window.draw(*_spacerToChat);
+    _data->window.draw(*_tittleToChatText);
+    _chatTextField->draw(_data->window);
+    _data->window.draw(*_sendMessageIcon);
 
     _data->window.draw(*_hostIcon);
     _data->window.draw(*_clientIcon);
@@ -493,6 +553,10 @@ LobbyState::~LobbyState() {
     delete _configureButtonText;
     delete _backButton;
     delete _backButtonText;
+    delete _spacerToChat;
+    delete _tittleToChatText;
+    delete _chatTextField;
+    delete _sendMessageIcon;
     delete _networkLobbyManager;
 
 }

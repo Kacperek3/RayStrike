@@ -11,6 +11,8 @@ TextField::TextField(float x, float y, float width, float height, sf::Font& font
     text.setCharacterSize(charSize);
     text.setFillColor(sf::Color::Black);
     text.setPosition(x + 5, y + 5);
+
+    defaultOutlineColor = sf::Color::Black;
 }
 
 void TextField::setPosition(float x, float y) {
@@ -29,7 +31,7 @@ void TextField::handleEvent(const sf::Event& event) {
     if (event.type == sf::Event::MouseButtonPressed) {
         sf::Vector2f mousePos(event.mouseButton.x, event.mouseButton.y);
         isActive = box.getGlobalBounds().contains(mousePos);
-        box.setOutlineColor(isActive ? sf::Color(80, 150, 255,150) : sf::Color::Black);
+        box.setOutlineColor(isActive ? sf::Color(80, 150, 255,150) : defaultOutlineColor);
     }
     else if (isActive && event.type == sf::Event::TextEntered) {
         if (event.text.unicode == 8) {
