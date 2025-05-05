@@ -16,6 +16,7 @@ public:
     void setOutlineColor(sf::Color color) { defaultOutlineColor = color; box.setOutlineColor(color); }
     void setTextColor(sf::Color color) { text.setFillColor(color); }
     void setInput(const std::string& str) { input = str; text.setString(str); }
+    bool getIsActive() const { return isActive; }
 
 private:
     sf::RectangleShape box;

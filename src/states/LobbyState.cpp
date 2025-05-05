@@ -252,6 +252,16 @@ void LobbyState::HandleInput() {
             _data->window.close();
             return;
         }
+        if(event.type == sf::Event::KeyPressed) {
+            if (event.key.code == sf::Keyboard::Enter && _chatTextField->getIsActive()) {
+                std::string message = _chatTextField->getInput();
+                if(!message.empty()){
+                    _networkLobbyManager->Send("__CHAT__" + message);
+                    AddMessageToChat(_yourName + " : " + message, _yourColor);
+                    _chatTextField->setInput("");
+                }
+            }
+        }
         if(event.type == sf::Event::MouseButtonPressed ) {
             if (event.mouseButton.button == sf::Mouse::Left) {
                 sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
