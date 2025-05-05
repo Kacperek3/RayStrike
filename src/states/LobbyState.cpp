@@ -43,10 +43,13 @@ LobbyState::LobbyState(const LobbyConfig config) : _config(config), _data(config
     _titleText = new sf::Text();
 
     _tesseract = new Tesseract();
+    _tesseractBackground = new Tesseract();
 
 
     _startGameButton = new sf::RectangleShape();
     _startGameButtonText = new sf::Text();
+    _readyGameButton = new sf::RectangleShape();
+    _readyGameButtonText = new sf::Text();
     _configureButton = new sf::RectangleShape();
     _configureButtonText = new sf::Text();
     _backButton = new sf::RectangleShape();
@@ -205,6 +208,15 @@ void LobbyState::Init(){
     _startGameButtonText->setFillColor(sf::Color::White);
     _startGameButtonText->setPosition(_startGameButton->getPosition().x + 35, _startGameButton->getPosition().y + 8);
 
+    _readyGameButton->setSize(sf::Vector2f(250, 50));
+    _readyGameButton->setFillColor(sf::Color(80, 150, 255,150));
+    _readyGameButton->setPosition(sf::Vector2f(280, 260));
+    _readyGameButtonText->setFont(_font);
+    _readyGameButtonText->setString("Ready");
+    _readyGameButtonText->setCharacterSize(30);
+    _readyGameButtonText->setFillColor(sf::Color::White);
+    _readyGameButtonText->setPosition(_readyGameButton->getPosition().x + 70, _readyGameButton->getPosition().y + 8);
+
     _configureButton->setSize(sf::Vector2f(250, 50));
     _configureButton->setFillColor(sf::Color(80, 150, 255,150));
     _configureButton->setPosition(sf::Vector2f(280, 260));
@@ -227,6 +239,10 @@ void LobbyState::Init(){
     _tesseract->setScale(0.15f);
     _tesseract->setColor(sf::Color(255, 223, 0,120));
 
+    _tesseractBackground->setPosition(sf::Vector2f(620, 400));
+    _tesseractBackground->setScale(3.0f);
+    _tesseractBackground->setColor(sf::Color(255, 255, 255, 40));
+
     auto storeButtonData = [&](sf::RectangleShape* btn, sf::Text* txt) {
         sf::Vector2f originalBtnPos = btn->getPosition();
         sf::Vector2f originalTxtPos = txt->getPosition();
@@ -236,6 +252,7 @@ void LobbyState::Init(){
     };
     storeButtonData(_backButton, _backButtonText);  
     storeButtonData(_startGameButton, _startGameButtonText);
+    storeButtonData(_readyGameButton, _readyGameButtonText);
     storeButtonData(_configureButton, _configureButtonText);
     
 
@@ -269,11 +286,40 @@ void LobbyState::HandleInput() {
                     _animationState = AnimationState::EXITING;
                     _networkLobbyManager->Send("__DISCONNECT__");
                 }
-                else if (_startGameButton->getGlobalBounds().contains(mousePos)) {
-                    _animationState = AnimationState::EXITING;
-                    _networkLobbyManager->Send("__START_GAME__");
+                else if (_startGameButton->getGlobalBounds().contains(mousePos) && _config.isHost) {
+                    //_animationState = AnimationState::EXITING;
+                    //_networkLobbyManager->Send("__START_GAME__");
+
+                    std::string message = "host is ready";
+                    AddMessageToChat(message, sf::Color(0, 255, 0, 120), 14, 140);
+
+                    _networkLobbyManager->Send("__HOST_READY__" + message);
+                    _hostHintText->setFillColor(sf::Color(0, 255, 0, 120));
+                    _hostHintText->setString("Ready");
+                    _isHostReady = true;
+
+                    if(_isHostReady && _isClientReady) {
+                        std::string message = "Game starts in 5 seconds";
+                        AddMessageToChat(message, sf::Color(0, 255, 0, 120), 14, 90);
+                        _networkLobbyManager->Send("__START_GAME__" + message);
+                    } 
                 }
-                else if (_configureButton->getGlobalBounds().contains(mousePos)) {
+                else if (_readyGameButton->getGlobalBounds().contains(mousePos) && !_config.isHost) {
+                    std::string message = "client is ready";
+                    AddMessageToChat(message, sf::Color(0, 255, 0, 120), 14, 140);
+
+                    _networkLobbyManager->Send("__CLIENT_READY__" + message);
+                    _clientHintText->setFillColor(sf::Color(0, 255, 0, 120));
+                    _clientHintText->setString("Ready");
+                    _isClientReady = true;
+
+                    if(_isHostReady && _isClientReady) {
+                        std::string message = "Game starts in 5 seconds";
+                        AddMessageToChat(message, sf::Color(0, 255, 0, 120), 14, 90);
+                        _networkLobbyManager->Send("__START_GAME__" + message);
+                    } 
+                }
+                else if (_configureButton->getGlobalBounds().contains(mousePos) && _config.isHost) {
                     _animationState = AnimationState::EXITING;
                     _networkLobbyManager->Send("__CONFIGURE__");
                 }
@@ -282,6 +328,10 @@ void LobbyState::HandleInput() {
                         _gameSettings.numberOfRounds++;
                         _numberOfRoundsText->setString("Number of rounds: " + std::to_string(_gameSettings.numberOfRounds));
                         _networkLobbyManager->Send("__NUMBER_OF_ROUNDS__" + std::to_string(_gameSettings.numberOfRounds));
+                        
+                        std::string message = "host changed number of rounds to " + std::to_string(_gameSettings.numberOfRounds);
+                        _networkLobbyManager->Send("__CHAT_CHANGED_CONFIG__" + message);
+                        AddMessageToChat(message, sf::Color(255, 255, 255, 120), 14, 40);
                     }
                 }
                 else if(_minusNumOfRoundsIcon->getGlobalBounds().contains(mousePos) && _config.isHost){
@@ -289,6 +339,10 @@ void LobbyState::HandleInput() {
                         _gameSettings.numberOfRounds--;
                         _numberOfRoundsText->setString("Number of rounds: " + std::to_string(_gameSettings.numberOfRounds));
                         _networkLobbyManager->Send("__NUMBER_OF_ROUNDS__" + std::to_string(_gameSettings.numberOfRounds));
+
+                        std::string message = "host changed number of rounds to " + std::to_string(_gameSettings.numberOfRounds);
+                        _networkLobbyManager->Send("__CHAT_CHANGED_CONFIG__" + message);
+                        AddMessageToChat(message, sf::Color(255, 255, 255, 120), 14, 40);
                     }
                 }
                 else if(_plusTimeLimitIcon->getGlobalBounds().contains(mousePos) && _config.isHost){
@@ -296,6 +350,10 @@ void LobbyState::HandleInput() {
                         _gameSettings.timeLimit+=5;
                         _timeLimitText->setString("Time limit: " + std::to_string(_gameSettings.timeLimit)+ " sec");
                         _networkLobbyManager->Send("__TIME_LIMIT__" + std::to_string(_gameSettings.timeLimit));
+
+                        std::string message = "host changed time limit to " + std::to_string(_gameSettings.timeLimit) + " sec";
+                        _networkLobbyManager->Send("__CHAT_CHANGED_CONFIG__" + message);
+                        AddMessageToChat(message, sf::Color(255, 255, 255, 120), 14, 40);
                     }
                 }
                 else if(_minusTimeLimitIcon->getGlobalBounds().contains(mousePos) && _config.isHost){
@@ -303,6 +361,10 @@ void LobbyState::HandleInput() {
                         _gameSettings.timeLimit-=5;
                         _timeLimitText->setString("Time limit: " + std::to_string(_gameSettings.timeLimit) + " sec");
                         _networkLobbyManager->Send("__TIME_LIMIT__" + std::to_string(_gameSettings.timeLimit));
+
+                        std::string message = "host changed time limit to " + std::to_string(_gameSettings.timeLimit) + " sec";
+                        _networkLobbyManager->Send("__CHAT_CHANGED_CONFIG__" + message);
+                        AddMessageToChat(message, sf::Color(255, 255, 255, 120), 14, 40);
                     }
                 }
                 else if(_sendMessageIcon->getGlobalBounds().contains(mousePos)){
@@ -319,11 +381,11 @@ void LobbyState::HandleInput() {
     }
 }
 
-void LobbyState::AddMessageToChat(const std::string& message, const sf::Color& color) {
+void LobbyState::AddMessageToChat(const std::string& message, const sf::Color& color, int fontSize, int offsetX) {
     sf::Text* newMsg = new sf::Text();
     newMsg->setFont(_font);
     newMsg->setString(message);
-    newMsg->setCharacterSize(18);
+    newMsg->setCharacterSize(fontSize);
     newMsg->setFillColor(color);
 
     const float maxWidth = 380.0f;
@@ -347,31 +409,35 @@ void LobbyState::AddMessageToChat(const std::string& message, const sf::Color& c
         newMsg->setString(wrappedText);
     }
 
-    _chatMessages.push_back(newMsg);
+    _chatMessages.push_back({newMsg, offsetX});
 
     if(_chatMessages.size() > 10) {
-        delete _chatMessages.front();
+        delete _chatMessages.front().text;
         _chatMessages.erase(_chatMessages.begin());
     }
-
     UpdateChatPositions();
 }
 
 void LobbyState::UpdateChatPositions() {
     const float startY = 760.0f - 40.0f;
+    const float baseX = 790.0f;
     const float lineHeight = 25.0f;
     float currentY = startY;
 
     for(auto it = _chatMessages.rbegin(); it != _chatMessages.rend(); ++it) {
-        sf::Text* msg = *it;
+        MessageData& msgData = *it;
+        sf::Text* msg = msgData.text;
+        
         int numLines = std::count(msg->getString().begin(), msg->getString().end(), '\n') + 1;
-        msg->setPosition(790.0f, currentY - (numLines * lineHeight));
+        msg->setPosition(baseX + msgData.offsetX, currentY - (numLines * lineHeight));
+        
         currentY -= numLines * lineHeight + 5.0f;
     }
 }
 
 void LobbyState::Update() {
     _tesseract->update();
+    _tesseractBackground->update();
     // Animation logic
     if(_animationState == AnimationState::ENTERING) {
         enteringAnimation();
@@ -380,6 +446,7 @@ void LobbyState::Update() {
     } else {
         standartAnimation();
     }
+
 
     std::string msg;
     while (_networkLobbyManager->WaitForMessage(msg, 0)) {
@@ -422,6 +489,47 @@ void LobbyState::Update() {
                 std::string receivedMessage = msg.substr(pos + prefix.length());
                 AddMessageToChat(_enemyName + " : " + receivedMessage, _enemyColor);
             }
+        }
+        else if(msg.find("__HOST_READY__") != std::string::npos) {
+            std::string prefix = "__HOST_READY__";
+            size_t pos = msg.find(prefix);
+            if (pos != std::string::npos) {
+                std::string receivedMessage = msg.substr(pos + prefix.length());
+                _hostHintText->setFillColor(sf::Color(0, 255, 0, 120));
+                _hostHintText->setString("Ready");
+                std::cout << receivedMessage << std::endl;
+                AddMessageToChat(receivedMessage, sf::Color(0, 255, 0, 120), 14, 140);
+            }
+            _isHostReady = true;
+        }
+        else if(msg.find("__CLIENT_READY__") != std::string::npos) {
+            std::string prefix = "__CLIENT_READY__";
+            size_t pos = msg.find(prefix);
+            if (pos != std::string::npos) {
+                std::string receivedMessage = msg.substr(pos + prefix.length());
+                _clientHintText->setFillColor(sf::Color(0, 255, 0, 120));
+                _clientHintText->setString("Ready");
+                std::cout << receivedMessage << std::endl;
+                AddMessageToChat(receivedMessage, sf::Color(0, 255, 0, 120), 14, 140);
+            }
+            _isClientReady = true;
+        }
+        else if(msg.find("__CHAT_CHANGED_CONFIG__") != std::string::npos) {
+            std::string prefix = "__CHAT_CHANGED_CONFIG__";
+            size_t pos = msg.find(prefix);
+            if (pos != std::string::npos) {
+                std::string receivedMessage = msg.substr(pos + prefix.length());
+                AddMessageToChat(receivedMessage, sf::Color(255, 255, 255, 120), 14, 40);
+            }
+        }
+        else if(msg.find("__START_GAME__") != std::string::npos) {
+            std::string prefix = "__START_GAME__";
+            size_t pos = msg.find(prefix);
+            if (pos != std::string::npos) {
+                std::string receivedMessage = msg.substr(pos + prefix.length());
+                AddMessageToChat(receivedMessage, sf::Color(0, 255, 0, 120), 14, 90);
+            }
+            //_animationState = AnimationState::EXITING;
         }
     }
 }
@@ -474,8 +582,6 @@ void LobbyState::enteringAnimation() {
         }
     }
 
-
-    
     sf::Vector2f currentPos = _titleText->getPosition();
 
     if (currentPos.x > 0) {
@@ -525,6 +631,7 @@ void LobbyState::standartAnimation(){
 
         if (button == _backButton) text = _backButtonText;
         else if (button == _startGameButton) text = _startGameButtonText;
+        else if (button == _readyGameButton) text = _readyGameButtonText;
         else if (button == _configureButton) text = _configureButtonText;
         
         if (originalBounds.contains(mousePos)) {
@@ -543,6 +650,7 @@ void LobbyState::standartAnimation(){
 void LobbyState::Draw() {
     _data->window.clear();
     _data->window.draw(*_backgroundTexture);
+    _tesseractBackground->draw(_data->window);
     _data->window.draw(*_backgroundPlayerList);
     _data->window.draw(*_backgroundPlayerListPanel);
     _data->window.draw(*_spacer);
@@ -567,10 +675,6 @@ void LobbyState::Draw() {
 
     _data->window.draw(*_titleText);
 
-    _data->window.draw(*_startGameButton);
-    _data->window.draw(*_startGameButtonText);
-    _data->window.draw(*_configureButton);
-    _data->window.draw(*_configureButtonText);
     _data->window.draw(*_backButton);
     _data->window.draw(*_backButtonText);
 
@@ -583,13 +687,22 @@ void LobbyState::Draw() {
     _data->window.draw(*_clientIcon);
 
     if(_config.isHost){
+        _data->window.draw(*_startGameButton);
+        _data->window.draw(*_startGameButtonText);
+        _data->window.draw(*_configureButton);
+        _data->window.draw(*_configureButtonText);
         _data->window.draw(*_plusNumOfRoundsIcon);
         _data->window.draw(*_minusNumOfRoundsIcon);
         _data->window.draw(*_plusTimeLimitIcon);
         _data->window.draw(*_minusTimeLimitIcon);
     }
-    for(auto& msg : _chatMessages) {
-        _data->window.draw(*msg);
+    else if(!_config.isHost){
+        _data->window.draw(*_readyGameButton);
+        _data->window.draw(*_readyGameButtonText);
+    }
+
+    for(auto& msgData : _chatMessages) {
+        _data->window.draw(*msgData.text);
     }
     _data->window.display();
 }
@@ -622,9 +735,12 @@ LobbyState::~LobbyState() {
     delete _numberOfRoundsText;
     delete _timeLimitText;
     delete _tesseract;
+    delete _tesseractBackground;
     delete _titleText;
     delete _startGameButton;
     delete _startGameButtonText;
+    delete _readyGameButton;
+    delete _readyGameButtonText;
     delete _configureButton;
     delete _configureButtonText;
     delete _backButton;
@@ -633,8 +749,8 @@ LobbyState::~LobbyState() {
     delete _tittleToChatText;
     delete _chatTextField;
     delete _sendMessageIcon;
-    for(auto& msg : _chatMessages) {
-        delete msg;
+    for(auto& msgData : _chatMessages) {
+        delete msgData.text;
     }
     _chatMessages.clear();
     delete _networkLobbyManager;

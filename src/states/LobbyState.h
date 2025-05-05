@@ -28,12 +28,14 @@ public:
 
 
 private:
-    void AddMessageToChat(const std::string& message, const sf::Color& color);
+    void AddMessageToChat(const std::string& message, const sf::Color& color, int fontSize = 18, int offsetX = 0);
     void UpdateChatPositions();
     std::string _yourName;
     std::string _enemyName;
     sf::Color _yourColor;
     sf::Color _enemyColor;
+    bool _isHostReady = false;
+    bool _isClientReady = false;
 
     enum class AnimationState {
         ENTERING,
@@ -93,22 +95,29 @@ private:
 
     sf::RectangleShape *_startGameButton;
     sf::Text *_startGameButtonText;
+    sf::RectangleShape *_readyGameButton;
+    sf::Text *_readyGameButtonText;
     sf::RectangleShape *_configureButton;
     sf::Text *_configureButtonText;
     sf::RectangleShape *_backButton;
     sf::Text *_backButtonText;
+
+
+    //------------------------------------------
     //chat
+    struct MessageData {
+        sf::Text* text;
+        int offsetX;
+    };
     sf::RectangleShape *_spacerToChat;
     sf::Text *_tittleToChatText;
     TextField *_chatTextField;
     sf::Sprite *_sendMessageIcon;
-    std::vector<sf::Text*> _chatMessages;
+    std::vector<MessageData> _chatMessages;
+    //------------------------------------------
 
-
-    
     Tesseract *_tesseract;
-    
-
+    Tesseract *_tesseractBackground;
     const float _exitAnimationSpeed = 80.0f;
 
 

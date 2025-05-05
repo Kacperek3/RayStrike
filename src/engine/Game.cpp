@@ -32,7 +32,7 @@ Game::Game(int width, int height, std::string title) {
     lobbyConfig.clientSocket = -1;
     lobbyConfig.hostName = "Player 1";
     lobbyConfig.clientName = "Player 2";
-    lobbyConfig.isHost = true;
+    lobbyConfig.isHost = false;
 
     //_data->stateManager.AddState(StateRef(new LobbyState(lobbyConfig)), true);
     
