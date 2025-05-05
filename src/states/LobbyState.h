@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <ctime>
 #include <cmath>
+#include <sstream>
 
 #include "NetworkLobbyManager.h"
 #include "LobbyConfig.h"
@@ -27,6 +28,12 @@ public:
 
 
 private:
+    void AddMessageToChat(const std::string& message, const sf::Color& color);
+    void UpdateChatPositions();
+    std::string _yourName;
+    std::string _enemyName;
+    sf::Color _yourColor;
+    sf::Color _enemyColor;
 
     enum class AnimationState {
         ENTERING,

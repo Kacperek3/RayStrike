@@ -60,7 +60,10 @@ void LobbyState::Init(){
         std::cout << "Failed to load font" << std::endl;
     }
 
-
+    _yourName = _config.isHost ? _config.hostName : _config.clientName;
+    _enemyName = _config.isHost ? _config.clientName : _config.hostName;
+    _yourColor = _config.isHost ? sf::Color(255, 223, 0) : sf::Color(230, 230, 230);
+    _enemyColor = _config.isHost ? sf::Color(230, 230, 230) : sf::Color(255, 223, 0);
 
     _data->assetManager.LoadTexture("background", "assets/background.jpg");
     _backgroundTexture->setTexture(_data->assetManager.GetTexture("background"));
@@ -296,12 +299,64 @@ void LobbyState::HandleInput() {
                     std::string message = _chatTextField->getInput();
                     if(!message.empty()){
                         _networkLobbyManager->Send("__CHAT__" + message);
+                        AddMessageToChat(_yourName + " : " + message, _yourColor);
                         _chatTextField->setInput("");
                     }
                 }
             }
             return;
         }
+    }
+}
+
+void LobbyState::AddMessageToChat(const std::string& message, const sf::Color& color) {
+    sf::Text* newMsg = new sf::Text();
+    newMsg->setFont(_font);
+    newMsg->setString(message);
+    newMsg->setCharacterSize(18);
+    newMsg->setFillColor(color);
+
+    const float maxWidth = 380.0f;
+    sf::FloatRect textRect = newMsg->getLocalBounds();
+    if(textRect.width > maxWidth) {
+        std::string wrappedText;
+        std::string currentLine;
+        std::istringstream iss(message);
+        std::string word;
+        
+        while(iss >> word) {
+            sf::Text tempLine(currentLine + word + " ", _font, 18);
+            if(tempLine.getLocalBounds().width < maxWidth) {
+                currentLine += word + " ";
+            } else {
+                wrappedText += currentLine + "\n";
+                currentLine = word + " ";
+            }
+        }
+        wrappedText += currentLine;
+        newMsg->setString(wrappedText);
+    }
+
+    _chatMessages.push_back(newMsg);
+
+    if(_chatMessages.size() > 10) {
+        delete _chatMessages.front();
+        _chatMessages.erase(_chatMessages.begin());
+    }
+
+    UpdateChatPositions();
+}
+
+void LobbyState::UpdateChatPositions() {
+    const float startY = 760.0f - 40.0f;
+    const float lineHeight = 25.0f;
+    float currentY = startY;
+
+    for(auto it = _chatMessages.rbegin(); it != _chatMessages.rend(); ++it) {
+        sf::Text* msg = *it;
+        int numLines = std::count(msg->getString().begin(), msg->getString().end(), '\n') + 1;
+        msg->setPosition(790.0f, currentY - (numLines * lineHeight));
+        currentY -= numLines * lineHeight + 5.0f;
     }
 }
 
@@ -348,6 +403,14 @@ void LobbyState::Update() {
                 } catch (const std::exception& e) {
                     std::cerr << "Error parsing time limit: " << e.what() << std::endl;
                 }
+            }
+        }
+        else if (msg.find("__CHAT__") != std::string::npos) {
+            std::string prefix = "__CHAT__";
+            size_t pos = msg.find(prefix);
+            if (pos != std::string::npos) {
+                std::string receivedMessage = msg.substr(pos + prefix.length());
+                AddMessageToChat(_enemyName + " : " + receivedMessage, _enemyColor);
             }
         }
     }
@@ -515,6 +578,9 @@ void LobbyState::Draw() {
         _data->window.draw(*_plusTimeLimitIcon);
         _data->window.draw(*_minusTimeLimitIcon);
     }
+    for(auto& msg : _chatMessages) {
+        _data->window.draw(*msg);
+    }
     _data->window.display();
 }
 
@@ -557,6 +623,10 @@ LobbyState::~LobbyState() {
     delete _tittleToChatText;
     delete _chatTextField;
     delete _sendMessageIcon;
+    for(auto& msg : _chatMessages) {
+        delete msg;
+    }
+    _chatMessages.clear();
     delete _networkLobbyManager;
 
 }
