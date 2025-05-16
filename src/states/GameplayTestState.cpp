@@ -1,16 +1,16 @@
-#include "GameplayState.h"
+#include "GameplayTestState.h"
 
-GameplayState::GameplayState(GameDataRef data) : _data(data) {
+GameplayTestState::GameplayTestState(GameDataRef data, int serverTcpSocket, int clientTcpSocket) : _data(data), clientTcpSocket(clientTcpSocket), serverTcpSocket(serverTcpSocket) {
     srand(static_cast<unsigned>(time(NULL)));
     _titleText = new sf::Text();
     _playerCircle = new sf::CircleShape();
     _enemyCircle = new sf::CircleShape();
-    _networkManager = new NetworkGameManager(false, "192.168.1.5", 54000);
+    _udpNetworkManager = new UdpNetworkManager(serverTcpSocket, clientTcpSocket);
 
     _clock = new sf::Clock();
 }
 
-void GameplayState::Init(){
+void GameplayTestState::Init(){
     if (!_font.loadFromFile("assets/fonts/Orbitron/Orbitron-VariableFont_wght.ttf")) {
         std::cout << "Failed to load font" << std::endl;
     }
@@ -45,9 +45,15 @@ void GameplayState::Init(){
     _enemyCircle->setPointCount(30);
 
 
+    if (!_udpNetworkManager->Initialize()) {
+        std::cerr << "Blad inicjalizacji UDP\n";
+        close(clientTcpSocket);
+        close(serverTcpSocket);
+    }
+    std::cout << "Polaczenie UDP nawiazane!\n";
 }
 
-void GameplayState::HandleInput() {
+void GameplayTestState::HandleInput() {
     sf::Event event;
     while (_data->window.pollEvent(event)) {
         if (event.type == sf::Event::Closed) {
@@ -68,7 +74,7 @@ void GameplayState::HandleInput() {
         }
 }
 
-void GameplayState::Update() {
+void GameplayTestState::Update() {
     const float moveSpeed = 200.0f; // piksele na sekundę
 
     float deltaTime = _clock->restart().asSeconds(); // czas od ostatniej klatki
@@ -100,21 +106,22 @@ void GameplayState::Update() {
     }
 
 
-   if(_networkManager->IsConnected()) {
-        float otherX, otherY;
-        _networkManager->GetEnemyPosition(otherX, otherY);
-        _enemyCircle->setPosition(otherX, otherY);
-        
-        _networkManager->SendPosition(
-            _playerCircle->getPosition().x,
-            _playerCircle->getPosition().y
-        );
+   std::string received;
+    if (_udpNetworkManager->WaitForMessage(received, 100)) {
+        // Przetwarzanie danych (np. pozycja gracza)
+        size_t sep = received.find(',');
+        if (sep != std::string::npos) {
+            float x = std::stof(received.substr(0, sep));
+            float y = std::stof(received.substr(sep+1));
+            
+            _enemyCircle->setPosition(x, y);
+        }
     }
-    
+    _udpNetworkManager->Send(std::to_string(_playerCircle->getPosition().x) + "," + std::to_string(_playerCircle->getPosition().y));
 
 }
 
-void GameplayState::exitingAnimation() {
+void GameplayTestState::exitingAnimation() {
     
     sf::Vector2f currentPos = _titleText->getPosition();
 
@@ -133,7 +140,7 @@ void GameplayState::exitingAnimation() {
     return;
 }
 
-void GameplayState::enteringAnimation() {
+void GameplayTestState::enteringAnimation() {
     sf::Vector2f currentPos = _titleText->getPosition();
 
     if (currentPos.x > 0) {
@@ -148,13 +155,13 @@ void GameplayState::enteringAnimation() {
     }
 }
 
-void GameplayState::standartAnimation(){
+void GameplayTestState::standartAnimation(){
     sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
 
     return;
 }
 
-void GameplayState::Draw() {
+void GameplayTestState::Draw() {
     _data->window.clear();
     _data->window.draw(*_titleText);
     _data->window.draw(*_playerCircle);
@@ -165,16 +172,15 @@ void GameplayState::Draw() {
 }
 
 
-GameplayState::~GameplayState() {
+GameplayTestState::~GameplayTestState() {
     delete _titleText;
     delete _playerCircle;
     delete _enemyCircle;
     delete _clock;
-    delete _networkManager;
-    
+    delete _udpNetworkManager;
 }
 
 
-void GameplayState::ClearObjects() {
+void GameplayTestState::ClearObjects() {
 
 }

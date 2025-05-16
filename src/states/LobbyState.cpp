@@ -1,4 +1,5 @@
 #include "LobbyState.h"
+#include "GameplayTestState.h"
 
 LobbyState::LobbyState(const LobbyConfig config) : _config(config), _data(config.data) {
     srand(static_cast<unsigned>(time(NULL)));
@@ -302,6 +303,8 @@ void LobbyState::HandleInput() {
                         std::string message = "Game starts in 5 seconds";
                         AddMessageToChat(message, sf::Color(0, 255, 0, 120), 14, 90);
                         _networkLobbyManager->Send("__START_GAME__" + message);
+                        // nowy state z grameplay
+
                     } 
                 }
                 else if (_readyGameButton->getGlobalBounds().contains(mousePos) && !_config.isHost) {
@@ -317,6 +320,9 @@ void LobbyState::HandleInput() {
                         std::string message = "Game starts in 5 seconds";
                         AddMessageToChat(message, sf::Color(0, 255, 0, 120), 14, 90);
                         _networkLobbyManager->Send("__START_GAME__" + message);
+                        // nowy state z grameplay
+                        std::cout << "Penis";
+                        _data->stateManager.AddState(StateRef(new GameplayTestState(_data,_config.serverSocketForClient, _config.clientSocket)),false);
                     } 
                 }
                 else if (_configureButton->getGlobalBounds().contains(mousePos) && _config.isHost) {
@@ -529,6 +535,7 @@ void LobbyState::Update() {
                 std::string receivedMessage = msg.substr(pos + prefix.length());
                 AddMessageToChat(receivedMessage, sf::Color(0, 255, 0, 120), 14, 90);
             }
+            _data->stateManager.AddState(StateRef(new GameplayTestState(_data,_config.serverSocketForClient, _config.clientSocket)), false);
             //_animationState = AnimationState::EXITING;
         }
     }

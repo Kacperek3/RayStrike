@@ -6,14 +6,13 @@
 #include <ctime>
 #include <cmath>
 
-#include "NetworkManager.h"
-#include "NetworkGameManager.h"
+#include "UdpNetworkManager.h"
 
 
-class GameplayState : public State {
+class GameplayTestState : public State {
 public:
-    GameplayState(GameDataRef data);
-    ~GameplayState();
+    GameplayTestState(GameDataRef data, int serverTcpSocket, int clientTcpSocket);
+    ~GameplayTestState();
     void Init() override;
 
     void HandleInput() override;
@@ -47,7 +46,10 @@ private:
     sf::CircleShape *_enemyCircle;
     sf::Clock *_clock;
 
-    NetworkGameManager* _networkManager;
+    UdpNetworkManager* _udpNetworkManager;
+    int serverTcpSocket;
+    int clientTcpSocket;
+
 
 
 };
