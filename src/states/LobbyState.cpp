@@ -288,8 +288,6 @@ void LobbyState::HandleInput() {
                     _networkLobbyManager->Send("__DISCONNECT__");
                 }
                 else if (_startGameButton->getGlobalBounds().contains(mousePos) && _config.isHost) {
-                    //_animationState = AnimationState::EXITING;
-                    //_networkLobbyManager->Send("__START_GAME__");
 
                     std::string message = "host is ready";
                     AddMessageToChat(message, sf::Color(0, 255, 0, 120), 14, 140);
@@ -298,13 +296,15 @@ void LobbyState::HandleInput() {
                     _hostHintText->setFillColor(sf::Color(0, 255, 0, 120));
                     _hostHintText->setString("Ready");
                     _isHostReady = true;
-
+                    
                     if(_isHostReady && _isClientReady) {
+                        std::cout << "host odpala pierwszy wbija i wysyla info" << std::endl;
                         std::string message = "Game starts in 5 seconds";
                         AddMessageToChat(message, sf::Color(0, 255, 0, 120), 14, 90);
                         _networkLobbyManager->Send("__START_GAME__" + message);
                         // nowy state z grameplay
-
+                        sleep(1.5);
+                        _data->stateManager.AddState(StateRef(new GameplayTestState(_data,_config.serverSocketForClient, _config.clientSocket)),false);
                     } 
                 }
                 else if (_readyGameButton->getGlobalBounds().contains(mousePos) && !_config.isHost) {
@@ -321,7 +321,7 @@ void LobbyState::HandleInput() {
                         AddMessageToChat(message, sf::Color(0, 255, 0, 120), 14, 90);
                         _networkLobbyManager->Send("__START_GAME__" + message);
                         // nowy state z grameplay
-                        std::cout << "Penis";
+                        std::cout << "klient odpala pierwszy wbija i wysyla info" << std::endl;
                         _data->stateManager.AddState(StateRef(new GameplayTestState(_data,_config.serverSocketForClient, _config.clientSocket)),false);
                     } 
                 }
