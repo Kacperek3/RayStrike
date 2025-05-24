@@ -10,11 +10,20 @@ find_package(SFML 2.6 COMPONENTS graphics window system REQUIRED)
 file(GLOB_RECURSE SOURCES src/*.cpp)
 add_executable(RayStrike ${SOURCES})
 
-target_include_directories(RayStrike PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_include_directories(RayStrike PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/engine)
-target_include_directories(RayStrike PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/network)
-target_include_directories(RayStrike PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/states)
-target_include_directories(RayStrike PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/utills)
+set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+target_include_directories(RayStrike PRIVATE
+    ${SRC_DIR}
+    ${SRC_DIR}/StateEngine
+    ${SRC_DIR}/Menu/network
+    ${SRC_DIR}/Menu/states
+    ${SRC_DIR}/Menu/utills
+    ${SRC_DIR}/Game/engine
+    ${SRC_DIR}/Game/network
+    ${SRC_DIR}/Game/states
+    ${SRC_DIR}/Game/utills
+)
+
 
 file(COPY assets DESTINATION ${CMAKE_BINARY_DIR})
 
