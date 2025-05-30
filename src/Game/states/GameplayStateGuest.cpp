@@ -306,64 +306,6 @@ bool GameplayStateGuest::CheckWin() {
 }
 
 
-// void GameplayStateGuest::Update() {
-
-
-//     _enemy.core.hitbox.setPosition(_enemy.render.bodySprite->getPosition());
-
-//     _player.core.hitbox.move(_player.core.velocity);
-//     _player.render.bodySprite->setPosition(_player.core.hitbox.getPosition());
-//     UpdateGunTransform(_player.render.bodySprite, _player.render.gunSprite);
-//     UpdateGunRotation(_player.render.bodySprite, _player.render.gunSprite);
-
-//     // Don't update gun position for enemy.
-//     _enemy.render.gunSprite->setPosition(_enemy.render.bodySprite->getPosition());
-
-//     float healthPercentage = static_cast<float>(_player.core.health) / 100.f;
-//     _player.render.healthBarFill.setSize(sf::Vector2f(56.f * healthPercentage, 6.f));
-
-//     healthPercentage = static_cast<float>(_enemy.core.health) / 100.f;
-//     _enemy.render.healthBarFill.setSize(sf::Vector2f(56.f * healthPercentage, 6.f));
-
-//     DisplayPlayerData(_player);
-//     DisplayPlayerData(_enemy);
-
-//     sf::Vector2f position = _player.render.bodySprite->getPosition();
-//     position.x = std::clamp(position.x, 0.f, static_cast<float>(_windowSize.x));
-//     position.y = std::clamp(position.y, 0.f, static_cast<float>(_windowSize.y));
-//     _player.render.bodySprite->setPosition(position);
-
-//     for (auto it = _bullets.begin(); it != _bullets.end();) {
-//         it->sprite.move(it->velocity);
-//         it->hitbox.setPosition(it->sprite.getPosition());
-//         bool bulletHit = false;
-
-//         sf::Vector2f bulletPos = it->sprite.getPosition();
-//         sf::Vector2f enemyCenter = _enemy.core.hitbox.getPosition();
-//         float distance = std::hypot(bulletPos.x - enemyCenter.x,
-//                                   bulletPos.y - enemyCenter.y);
-//         float sumRadius = _enemy.core.hitbox.getRadius() + it->sprite.getGlobalBounds().width/2;
-//         if (distance <= sumRadius) {
-//             _enemy.core.health = std::max(0, _enemy.core.health - 10);
-//             bulletHit = true;
-//         }
-
-
-//         // Kolizja z granicami ekranu
-//         sf::FloatRect bulletBounds = it->sprite.getGlobalBounds();
-//         if (bulletBounds.left < -100 || bulletBounds.left > _windowSize.x + 100 ||
-//             bulletBounds.top < -100 || bulletBounds.top > _windowSize.y + 100) {
-//             bulletHit = true;
-//             }
-
-//         if (bulletHit) {
-//             it = _bullets.erase(it);
-//         } else {
-//             ++it;
-//         }
-//     }
-// }
-
 
 void GameplayStateGuest::FireBullet(sf::Sprite* sourceSprite, sf::Sprite* gunSprite) {
     Bullet newBullet;
