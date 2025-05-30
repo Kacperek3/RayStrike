@@ -70,8 +70,6 @@ ssize_t UdpNetworkManager::recv_all(int sockfd, void *buf, size_t len, int flags
 
 bool UdpNetworkManager::SetupUdpConnection() {
     std::cout << (_isServer ? "Host" : "Client") << " UdpNetworkManager: Setting up UDP connection..." << std::endl;
-    char ack_char = PORT_DATA_ACK; // Znak potwierdzenia
-    char received_ack_char = 0;    // Do przechowywania otrzymanego ACK
     ssize_t bytes_processed;
 
     // Server side
@@ -115,18 +113,8 @@ bool UdpNetworkManager::SetupUdpConnection() {
             close(_udpSocket);
             return false;
         }
+        std::cout << "Host: Successfully sent own UDP port to client." << std::endl; // Added log
 
-        // 2. Host waits for ACK from Client (confirming Client received Host's port)
-        std::cout << "Host: Waiting for ACK from client for host UDP port..." << std::endl;
-        bytes_processed = recv_all(_tcpSocket, &received_ack_char, sizeof(received_ack_char), 0);
-        if (bytes_processed <= 0 || received_ack_char != ack_char) {
-            std::cerr << "Host: Failed to receive valid ACK for host UDP port. Bytes: " << bytes_processed << " Char: " << (int)received_ack_char << std::endl;
-            close(_udpSocket);
-            return false;
-        }
-        std::cout << "Host: Received ACK from client for host UDP port." << std::endl;
-
-        // 3. Host waits to receive Client's UDP port
         int clientPort = 0;
         std::cout << "Host: Waiting to receive client UDP port via TCP socket " << _tcpSocket << std::endl;
         bytes_processed = recv_all(_tcpSocket, &clientPort, sizeof(clientPort), 0);
@@ -137,21 +125,6 @@ bool UdpNetworkManager::SetupUdpConnection() {
         }
         std::cout << "Host: Received client UDP port: " << clientPort << std::endl;
 
-        // 4. Host sends ACK to Client (confirming Host received Client's port)
-        std::cout << "Host: Sending ACK to client for client UDP port..." << std::endl;
-
-        //wait for the client to be ready
-        std::this_thread::sleep_for(std::chrono::milliseconds(700)); // Optional: wait for client to be ready
-
-        bytes_processed = send(_tcpSocket, &ack_char, sizeof(ack_char), 0);
-        if (bytes_processed != sizeof(ack_char)) {
-            std::cerr << "Host: Failed to send ACK for client UDP port. Sent " << bytes_processed << ". errno: " << strerror(errno) << std::endl;
-            close(_udpSocket);
-            return false;
-        }
-        std::cout << "Host: Successfully sent ACK for client UDP port." << std::endl;
-
-        // Configure remote address for UDP
         sockaddr_in tcpClientAddr{};
         socklen_t tcpLen = sizeof(tcpClientAddr);
         if (getpeername(_tcpSocket, (sockaddr*)&tcpClientAddr, &tcpLen) == -1) {
@@ -179,18 +152,18 @@ bool UdpNetworkManager::SetupUdpConnection() {
         }
         std::cout << "Client: Received server UDP port: " << serverPort << std::endl;
 
-        // 2. Client sends ACK to Host (confirming Client received Host's port)
-        std::cout << "Client: Sending ACK to host for host UDP port..." << std::endl;
+        // 2. Client sends ACK to Host (confirming Client received Host's port) - REMOVED
+        // std::cout << "Client: Sending ACK to host for host UDP port..." << std::endl;
         
-        //wait for the host to be ready
-        std::this_thread::sleep_for(std::chrono::milliseconds(700)); // Optional: wait for host to be ready
+        // //wait for the host to be ready
+        // std::this_thread::sleep_for(std::chrono::milliseconds(1100)); // Optional: wait for host to be ready
 
-        bytes_processed = send(_tcpSocket, &ack_char, sizeof(ack_char), 0);
-        if (bytes_processed != sizeof(ack_char)) {
-            std::cerr << "Client: Failed to send ACK for host UDP port. Sent " << bytes_processed << ". errno: " << strerror(errno) << std::endl;
-            return false;
-        }
-        std::cout << "Client: Successfully sent ACK for host UDP port." << std::endl;
+        // bytes_processed = send(_tcpSocket, &ack_char, sizeof(ack_char), 0);
+        // if (bytes_processed != sizeof(ack_char)) {
+        //     std::cerr << "Client: Failed to send ACK for host UDP port. Sent " << bytes_processed << ". errno: " << strerror(errno) << std::endl;
+        //     return false;
+        // }
+        // std::cout << "Client: Successfully sent ACK for host UDP port." << std::endl;
 
         // Create and bind client's UDP socket
         _udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
@@ -220,7 +193,7 @@ bool UdpNetworkManager::SetupUdpConnection() {
         std::cout << "Client: Sending own UDP port " << myPort << " to server via TCP socket " << _tcpSocket << std::endl;
         
         //wait for the host to be ready
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // Optional: wait for host to be ready
+        std::this_thread::sleep_for(std::chrono::milliseconds(1100)); // Optional: wait for host to be ready
 
         bytes_processed = send(_tcpSocket, &myPort, sizeof(myPort), 0);
         if (bytes_processed != sizeof(myPort)) {
@@ -228,16 +201,17 @@ bool UdpNetworkManager::SetupUdpConnection() {
             close(_udpSocket);
             return false;
         }
+        std::cout << "Client: Successfully sent own UDP port to server." << std::endl; // Added log
 
-        // 4. Client waits for ACK from Host (confirming Host received Client's port)
-        std::cout << "Client: Waiting for ACK from host for client UDP port..." << std::endl;
-        bytes_processed = recv_all(_tcpSocket, &received_ack_char, sizeof(received_ack_char), 0);
-        if (bytes_processed <= 0 || received_ack_char != ack_char) {
-            std::cerr << "Client: Failed to receive valid ACK for client UDP port. Bytes: " << bytes_processed << " Char: " << (int)received_ack_char << std::endl;
-            close(_udpSocket);
-            return false;
-        }
-        std::cout << "Client: Received ACK from host for client UDP port." << std::endl;
+        // 4. Client waits for ACK from Host (confirming Host received Client's port) - REMOVED
+        // std::cout << "Client: Waiting for ACK from host for client UDP port..." << std::endl;
+        // bytes_processed = recv_all(_tcpSocket, &received_ack_char, sizeof(received_ack_char), 0);
+        // if (bytes_processed <= 0 || received_ack_char != ack_char) {
+        //     std::cerr << "Client: Failed to receive valid ACK for client UDP port. Bytes: " << bytes_processed << " Char: " << (int)received_ack_char << std::endl;
+        //     close(_udpSocket);
+        //     return false;
+        // }
+        // std::cout << "Client: Received ACK from host for client UDP port." << std::endl;
 
         // Configure remote address for UDP
         sockaddr_in tcpServerAddr{};
