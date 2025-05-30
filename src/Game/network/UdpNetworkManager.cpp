@@ -189,18 +189,27 @@ bool UdpNetworkManager::SetupUdpConnection() {
         int myPort = ntohs(clientAddr.sin_port);
         std::cout << "Client: UDP socket bound to port: " << myPort << std::endl;
 
+
         // 3. Client sends its UDP port to Host
         std::cout << "Client: Sending own UDP port " << myPort << " to server via TCP socket " << _tcpSocket << std::endl;
-        
+        std::this_thread::sleep_for(std::chrono::milliseconds(4000)); // Optional: wait for host to be ready
         //wait for the host to be ready
-        std::this_thread::sleep_for(std::chrono::milliseconds(1100)); // Optional: wait for host to be ready
 
-        bytes_processed = send(_tcpSocket, &myPort, sizeof(myPort), 0);
+
+        for(int i = 0; i < 10; ++i) {
+            std::cout << "Client: Attempting to send own UDP port to server, attempt " << (i + 1) << std::endl;
+            bytes_processed = send(_tcpSocket, &myPort, sizeof(myPort), 0);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Wait a bit before retrying
+        }
+        std::cout << "send penis" << std::endl;
+
         if (bytes_processed != sizeof(myPort)) {
             std::cerr << "Client: Failed to send UDP port to server. Sent " << bytes_processed << ". errno: " << strerror(errno) << std::endl;
             close(_udpSocket);
             return false;
         }
+        std::cout << "send penis 2" << std::endl;
+
         std::cout << "Client: Successfully sent own UDP port to server." << std::endl; // Added log
 
         // 4. Client waits for ACK from Host (confirming Host received Client's port) - REMOVED

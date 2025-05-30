@@ -4,21 +4,16 @@
 #include <iostream> // Required for std::cerr, std::cout
 #include <string>   // Required for std::string, std::stof, std::stoi
 #include <stdexcept> // Required for std::invalid_argument, std::out_of_range
+#include <chrono> // Required for std::chrono::milliseconds
 
 #define PI 3.14159f
 
-GameplayStateGuest::GameplayStateGuest(GameDataRef data, int tcpSocketClient) : _data(data), _tcpSocketClient(tcpSocketClient) {
+GameplayStateGuest::GameplayStateGuest(GameDataRef data, int tcpSocketClient) : _data(data), _tcpSocketClient(tcpSocketClient), _running(true) {
     _windowSize = _data->window.getSize();
     _data->window.setMouseCursorVisible(false);
 
     // Initialize UdpNetworkManager for Guest
-    _udpManager = new UdpNetworkManager(-1, _tcpSocketClient); // tcpSocketServer is -1 for client
-    if (!_udpManager->Initialize()) {
-        std::cerr << "Guest: Failed to initialize UdpNetworkManager. TCP Socket: " << _tcpSocketClient << std::endl;
-        // Handle this critical error. For now, logging.
-        // This could be the source of the hang if Initialize() blocks,
-        // or a crash if it returns false and _udpManager is used later without being valid.
-    }
+    
 
     // Initialize render objects (similar to GameplayStateHost)
     _player.render.indicatorText = new sf::Text();
@@ -29,6 +24,17 @@ GameplayStateGuest::GameplayStateGuest(GameDataRef data, int tcpSocketClient) : 
     _player.render.gunSprite = new sf::Sprite();
     _enemy.render.bodySprite = new sf::Sprite();
     _enemy.render.gunSprite = new sf::Sprite();
+
+    _udpManager = new UdpNetworkManager(-1, _tcpSocketClient); // tcpSocketServer is -1 for client
+    if (!_udpManager->Initialize()) {
+        std::cerr << "Guest: Failed to initialize UdpNetworkManager. TCP Socket: " << _tcpSocketClient << std::endl;
+        // Handle this critical error. For now, logging.
+        // This could be the source of the hang if Initialize() blocks,
+        // or a crash if it returns false and _udpManager is used later without being valid.
+    }
+
+    // Start the network thread
+    _networkThread = std::thread(&GameplayStateGuest::ReceiveNetworkData, this);
 }
 
 void GameplayStateGuest::RoundInit() {
@@ -123,6 +129,7 @@ void GameplayStateGuest::HandleInput() {
     sf::Event event;
     while (_data->window.pollEvent(event)) {
         if (event.type == sf::Event::Closed) {
+            _running = false; // Signal network thread to stop
             _data->window.close();
             if (_udpManager) _udpManager->Send("disconnect"); // Informuj hosta o rozłączeniu
         }
@@ -197,82 +204,17 @@ void GameplayStateGuest::Update() {
         }
     }
 
-    // Odbieranie i przetwarzanie wiadomości od hosta
-    if (_udpManager && _udpManager->HasMessages()) {
-        std::string msg = _udpManager->PopMessage();
-        std::cout << "Guest Received MSG: " << msg << std::endl; // LOG RAW MESSAGE
-
-        size_t typeEnd = msg.find(';');
-        if (typeEnd != std::string::npos) {
-            std::string type = msg.substr(0, typeEnd);
-            std::string data = msg.substr(typeEnd + 1);
-            std::cout << "Guest Parsed Type: [" << type << "], Data: [" << data << "]" << std::endl;
-
-            if (type == "pos_enemy") {
-                size_t sep = data.find(';');
-                if (sep != std::string::npos) {
-                    try {
-                        float x = std::stof(data.substr(0, sep));
-                        float y = std::stof(data.substr(sep + 1));
-                        std::cout << "Guest Applying pos_enemy: x=" << x << ", y=" << y << std::endl;
-                        UpdateEnemyPosition({x, y});
-                    } catch (const std::invalid_argument& ia) {
-                        std::cerr << "Guest ERR: Invalid argument for std::stof in pos_enemy: " << ia.what() << " | Data: " << data << std::endl;
-                    } catch (const std::out_of_range& oor) {
-                        std::cerr << "Guest ERR: Out of range for std::stof in pos_enemy: " << oor.what() << " | Data: " << data << std::endl;
-                    }
-                } else {
-                     std::cerr << "Guest ERR: Malformed pos_enemy message (no separator for coords): " << data << std::endl;
-                }
-            } else if (type == "gun_angle_enemy") {
-                try {
-                    float angle = std::stof(data);
-                    std::cout << "Guest Applying gun_angle_enemy: " << angle << std::endl;
-                    _enemy.render.gunSprite->setRotation(angle);
-                } catch (const std::invalid_argument& ia) {
-                    std::cerr << "Guest ERR: Invalid argument for std::stof in gun_angle_enemy: " << ia.what() << " | Data: " << data << std::endl;
-                } catch (const std::out_of_range& oor) {
-                    std::cerr << "Guest ERR: Out of range for std::stof in gun_angle_enemy: " << oor.what() << " | Data: " << data << std::endl;
-                }
-            } else if (type == "fire_enemy") {
-                std::cout << "Guest Received fire_enemy. Data: " << data << std::endl;
-                // TODO: Implement full deserialization for enemy bullets
-                // Example format: "id;x;y;velX;velY;angle"
-                // For now, just logging. If host sends many/complex fire_enemy messages,
-                // and this part is slow or error-prone, it could delay other message processing.
-            } else if (type == "health_enemy") {
-                try {
-                    _enemy.core.health = std::stoi(data);
-                     std::cout << "Guest Applied health_enemy: " << _enemy.core.health << std::endl;
-                } catch (const std::invalid_argument& ia) {
-                    std::cerr << "Guest ERR: Invalid argument for std::stoi in health_enemy: " << ia.what() << " | Data: " << data << std::endl;
-                } catch (const std::out_of_range& oor) {
-                    std::cerr << "Guest ERR: Out of range for std::stoi in health_enemy: " << oor.what() << " | Data: " << data << std::endl;
-                }
-            } else if (type == "health_player") {
-                try {
-                    _player.core.health = std::stoi(data);
-                    std::cout << "Guest Applied health_player: " << _player.core.health << std::endl;
-                } catch (const std::invalid_argument& ia) {
-                    std::cerr << "Guest ERR: Invalid argument for std::stoi in health_player: " << ia.what() << " | Data: " << data << std::endl;
-                } catch (const std::out_of_range& oor) {
-                    std::cerr << "Guest ERR: Out of range for std::stoi in health_player: " << oor.what() << " | Data: " << data << std::endl;
-                }
-            } else if (type == "round_over") {
-                std::cout << "Guest Received round_over. Winner ID: " << data << std::endl;
-                // Obsługa końca rundy
-            } else if (type == "restart_game") {
-                std::cout << "Guest Received restart_game." << std::endl;
-                RoundInit();
-            } else {
-                std::cout << "Guest Received unknown message type: " << type << std::endl;
-            }
-        } else {
-            std::cerr << "Guest ERR: Received malformed message (no type separator ';'): " << msg << std::endl;
-        }
-    }
+    // Logika odbierania wiadomości została przeniesiona do ReceiveNetworkData()
+    // W metodzie Update() możemy przetwarzać dane przygotowane przez wątek sieciowy,
+    // np. aktualizować pozycję przeciwnika na podstawie danych chronionych mutexem.
+    // Poniższy blok jest przykładem, jak można by to zrobić, ale konkretna implementacja
+    // zależy od tego, jak dane są przekazywane z wątku sieciowego.
+    // W tym przykładzie zakładamy, że UpdateEnemyPosition i inne funkcje modyfikujące stan
+    // są wywoływane bezpośrednio z wątku sieciowego (z odpowiednią synchronizacją).
 
     // Aktualizacja pocisków przeciwnika (otrzymanych z sieci)
+    // Dostęp do _enemyBullets powinien być chroniony mutexem, jeśli jest modyfikowany przez wątek sieciowy
+    std::lock_guard<std::mutex> lock(_dataMutex);
     for (auto it = _enemyBullets.begin(); it != _enemyBullets.end();) {
         it->sprite.move(it->velocity);
         it->hitbox.setPosition(it->sprite.getPosition());
@@ -293,8 +235,91 @@ void GameplayStateGuest::Update() {
     DisplayPlayerData(_enemy);
 }
 
+void GameplayStateGuest::ReceiveNetworkData() {
+    while (_running) {
+        if (_udpManager && _udpManager->HasMessages()) {
+            std::string msg = _udpManager->PopMessage();
+            //std::cout << "Guest Received MSG (Thread): " << msg << std::endl; // LOG RAW MESSAGE
+
+            size_t typeEnd = msg.find(';');
+            if (typeEnd != std::string::npos) {
+                std::string type = msg.substr(0, typeEnd);
+                std::string data = msg.substr(typeEnd + 1);
+                //std::cout << "Guest Parsed Type (Thread): [" << type << "], Data: [" << data << "]" << std::endl;
+
+                std::lock_guard<std::mutex> lock(_dataMutex); // Lock before accessing shared data
+                if (type == "pos_enemy") {
+                    size_t sep = data.find(';');
+                    if (sep != std::string::npos) {
+                        try {
+                            float x = std::stof(data.substr(0, sep));
+                            float y = std::stof(data.substr(sep + 1));
+                            //std::cout << "Guest Applying pos_enemy (Thread): x=" << x << ", y=" << y << std::endl;
+                            UpdateEnemyPosition({x, y}); // This function modifies shared data (_enemy)
+                        } catch (const std::invalid_argument& ia) {
+                            std::cerr << "Guest ERR (Thread): Invalid argument for std::stof in pos_enemy: " << ia.what() << " | Data: " << data << std::endl;
+                        } catch (const std::out_of_range& oor) {
+                            std::cerr << "Guest ERR (Thread): Out of range for std::stof in pos_enemy: " << oor.what() << " | Data: " << data << std::endl;
+                        }
+                    } else {
+                         std::cerr << "Guest ERR (Thread): Malformed pos_enemy message (no separator for coords): " << data << std::endl;
+                    }
+                } else if (type == "gun_angle_enemy") {
+                    try {
+                        float angle = std::stof(data);
+                        //std::cout << "Guest Applying gun_angle_enemy (Thread): " << angle << std::endl;
+                        _enemy.render.gunSprite->setRotation(angle); // Modifies shared data
+                    } catch (const std::invalid_argument& ia) {
+                        std::cerr << "Guest ERR (Thread): Invalid argument for std::stof in gun_angle_enemy: " << ia.what() << " | Data: " << data << std::endl;
+                    } catch (const std::out_of_range& oor) {
+                        std::cerr << "Guest ERR (Thread): Out of range for std::stof in gun_angle_enemy: " << oor.what() << " | Data: " << data << std::endl;
+                    }
+                } else if (type == "fire_enemy") {
+                    //std::cout << "Guest Received fire_enemy (Thread). Data: " << data << std::endl;
+                    // TODO: Implement full deserialization for enemy bullets, ensuring thread safety
+                    // For example, add to a temporary queue and process in Update() or directly add to _enemyBullets with mutex.
+                } else if (type == "health_enemy") {
+                    try {
+                        _enemy.core.health = std::stoi(data); // Modifies shared data
+                        //std::cout << "Guest Applied health_enemy (Thread): " << _enemy.core.health << std::endl;
+                    } catch (const std::invalid_argument& ia) {
+                        std::cerr << "Guest ERR (Thread): Invalid argument for std::stoi in health_enemy: " << ia.what() << " | Data: " << data << std::endl;
+                    } catch (const std::out_of_range& oor) {
+                        std::cerr << "Guest ERR (Thread): Out of range for std::stoi in health_enemy: " << oor.what() << " | Data: " << data << std::endl;
+                    }
+                } else if (type == "health_player") {
+                    try {
+                        _player.core.health = std::stoi(data); // Modifies shared data
+                        //std::cout << "Guest Applied health_player (Thread): " << _player.core.health << std::endl;
+                    } catch (const std::invalid_argument& ia) {
+                        std::cerr << "Guest ERR (Thread): Invalid argument for std::stoi in health_player: " << ia.what() << " | Data: " << data << std::endl;
+                    } catch (const std::out_of_range& oor) {
+                        std::cerr << "Guest ERR (Thread): Out of range for std::stoi in health_player: " << oor.what() << " | Data: " << data << std::endl;
+                    }
+                } else if (type == "round_over") {
+                    //std::cout << "Guest Received round_over (Thread). Winner ID: " << data << std::endl;
+                    // Handle round over logic, potentially setting a flag to be checked in Update()
+                } else if (type == "restart_game") {
+                    //std::cout << "Guest Received restart_game (Thread)." << std::endl;
+                    RoundInit(); // Modifies shared game state
+                } else {
+                    //std::cout << "Guest Received unknown message type (Thread): " << type << std::endl;
+                }
+            } else {
+                //std::cerr << "Guest ERR (Thread): Received malformed message (no type separator ';'): " << msg << std::endl;
+            }
+        } else {
+            // Sleep for a short duration to avoid busy-waiting if no messages
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
+}
+
+
 void GameplayStateGuest::UpdateEnemyPosition(sf::Vector2f newPosition) {
-    std::cout << "Guest LOG: UpdateEnemyPosition called with: x=" << newPosition.x << ", y=" << newPosition.y << std::endl;
+    // This function is now called from ReceiveNetworkData, which holds the mutex.
+    // No need for an additional lock here if _dataMutex is already held by the caller.
+    //std::cout << "Guest LOG: UpdateEnemyPosition called with: x=" << newPosition.x << ", y=" << newPosition.y << std::endl;
     _enemy.core.hitbox.setPosition(newPosition);
     _enemy.render.bodySprite->setPosition(newPosition);
     UpdateGunTransform(_enemy.render.bodySprite, _enemy.render.gunSprite);
@@ -445,6 +470,11 @@ void GameplayStateGuest::Draw() {
 
 
 GameplayStateGuest::~GameplayStateGuest() {
+    _running = false; // Signal the network thread to stop
+    if (_networkThread.joinable()) {
+        _networkThread.join(); // Wait for the network thread to finish
+    }
+
     delete _player.render.indicatorText;
     delete _enemy.render.indicatorText;
 

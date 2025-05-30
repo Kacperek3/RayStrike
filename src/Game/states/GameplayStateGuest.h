@@ -3,6 +3,9 @@
 #include "State.h"
 #include <vector>
 #include "../network/UdpNetworkManager.h"
+#include <thread> // Added for std::thread
+#include <mutex>  // Added for std::mutex
+#include <atomic> // Added for std::atomic
 
 class GameplayStateGuest : public State {
 public:
@@ -53,6 +56,12 @@ private:
     Crosshair _crosshair;
     UdpNetworkManager* _udpManager;
 
+    // Network thread members
+    std::thread _networkThread;
+    std::mutex _dataMutex;
+    std::atomic<bool> _running;
+
+
     sf::Text *_roundOverText;
     sf::Text *_restartText;
 
@@ -63,7 +72,10 @@ private:
     int _tcpSocketClient;
 
     void UpdateEnemyPosition(sf::Vector2f newPosition);
-    void UpdateEnemyBullets(const std::vector<Bullet>& newBullets);
+    void UpdateEnemyBullets(const std::vector<Bullet>& newBullets); // This might need adjustment or removal if bullets are handled differently with threading
+
+    // Network thread function
+    void ReceiveNetworkData();
 
     void RoundInit();
     void UpdateGunTransform(sf::Sprite *targetSprite, sf::Sprite *gunSprite);
