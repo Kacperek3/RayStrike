@@ -44,77 +44,148 @@ bool UdpNetworkManager::SetupUdpConnection() {
     // Server side
     if (_isServer) {
         _udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
-        if (_udpSocket == -1) return false;
+        if (_udpSocket == -1) {
+            std::cerr << "Host: Failed to create UDP socket. errno: " << strerror(errno) << std::endl;
+            return false;
+        }
 
         sockaddr_in serverAddr{};
         serverAddr.sin_family = AF_INET;
         serverAddr.sin_addr.s_addr = INADDR_ANY;
-        serverAddr.sin_port = 0;
+        serverAddr.sin_port = 0; // Bind to a random available port
 
         if (bind(_udpSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
+            std::cerr << "Host: Failed to bind UDP socket. errno: " << strerror(errno) << std::endl;
             close(_udpSocket);
             return false;
         }
 
         // Get assigned port
         socklen_t len = sizeof(serverAddr);
-        getsockname(_udpSocket, (sockaddr*)&serverAddr, &len);
+        if (getsockname(_udpSocket, (sockaddr*)&serverAddr, &len) == -1) {
+            std::cerr << "Host: Failed to get socket name for UDP port. errno: " << strerror(errno) << std::endl;
+            close(_udpSocket);
+            return false;
+        }
         int myPort = ntohs(serverAddr.sin_port);
+        std::cout << "Host: UDP socket bound to port: " << myPort << std::endl;
 
         // Send UDP port to client
-        if (send(_tcpSocket, &myPort, sizeof(myPort), 0) != sizeof(myPort)) return false;
+        std::cout << "Host: Sending own UDP port " << myPort << " to client via TCP socket " << _tcpSocket << std::endl;
+        ssize_t sentBytes = send(_tcpSocket, &myPort, sizeof(myPort), 0);
+        if (sentBytes != sizeof(myPort)) {
+            std::cerr << "Host: Failed to send UDP port to client. Sent " << sentBytes << " bytes, expected " << sizeof(myPort) << ". errno: " << strerror(errno) << std::endl;
+            close(_udpSocket);
+            return false;
+        }
+        std::cout << "Host: Successfully sent own UDP port to client." << std::endl;
 
         // Get client UDP port
         int clientPort;
-        if (recv(_tcpSocket, &clientPort, sizeof(clientPort), 0) != sizeof(clientPort)) return false;
+        std::cout << "Host: Waiting to receive client UDP port via TCP socket " << _tcpSocket << std::endl;
+        ssize_t receivedBytes = recv(_tcpSocket, &clientPort, sizeof(clientPort), 0);
+        if (receivedBytes == -1) {
+            std::cerr << "Host: recv failed when expecting client UDP port. errno: " << strerror(errno) << std::endl;
+            close(_udpSocket);
+            return false;
+        } else if (receivedBytes == 0) {
+            std::cerr << "Host: TCP connection possibly closed by client while waiting for client UDP port (recv returned 0)." << std::endl;
+            close(_udpSocket);
+            return false;
+        } else if (receivedBytes != sizeof(clientPort)) {
+            std::cerr << "Host: Failed to receive full client UDP port. Expected " << sizeof(clientPort) << " bytes, got " << receivedBytes << ". errno: " << strerror(errno) << std::endl;
+            close(_udpSocket);
+            return false;
+        }
+        std::cout << "Host: Received client UDP port: " << clientPort << std::endl;
 
         // Get client IP from TCP
         sockaddr_in tcpClientAddr{};
         socklen_t tcpLen = sizeof(tcpClientAddr);
-        getpeername(_tcpSocket, (sockaddr*)&tcpClientAddr, &tcpLen);
+        if (getpeername(_tcpSocket, (sockaddr*)&tcpClientAddr, &tcpLen) == -1) {
+            std::cerr << "Host: Failed to get client IP address from TCP socket. errno: " << strerror(errno) << std::endl;
+            close(_udpSocket);
+            return false;
+        }
+        char clientIpStr[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &tcpClientAddr.sin_addr, clientIpStr, INET_ADDRSTRLEN);
+        std::cout << "Host: Client IP from TCP: " << clientIpStr << ", Client TCP Port: " << ntohs(tcpClientAddr.sin_port) << std::endl;
         
-        _remoteAddr = tcpClientAddr;
-        _remoteAddr.sin_port = htons(clientPort);
+        _remoteAddr = tcpClientAddr; // Copy IP
+        _remoteAddr.sin_port = htons(clientPort); // Set to client's UDP port
+        std::cout << "Host: Remote UDP address set to IP: " << clientIpStr << ", Port: " << clientPort << std::endl;
+
     }
     // Client side
     else {
         // Get server UDP port
         int serverPort;
         std::cout << "Client: Waiting to receive server UDP port via TCP socket " << _tcpSocket << std::endl;
-        if (recv(_tcpSocket, &serverPort, sizeof(serverPort), 0) != sizeof(serverPort)) {
-            std::cerr << "Client: Failed to receive server UDP port. errno: " << strerror(errno) << std::endl;
+        ssize_t receivedBytes = recv(_tcpSocket, &serverPort, sizeof(serverPort), 0);
+        if (receivedBytes == -1) {
+            std::cerr << "Client: recv failed when expecting server UDP port. errno: " << strerror(errno) << std::endl;
+            return false;
+        } else if (receivedBytes == 0) {
+            std::cerr << "Client: TCP connection possibly closed by server while waiting for server UDP port (recv returned 0)." << std::endl;
+            return false;
+        } else if (receivedBytes != sizeof(serverPort)) {
+            std::cerr << "Client: Failed to receive full server UDP port. Expected " << sizeof(serverPort) << " bytes, got " << receivedBytes << ". errno: " << strerror(errno) << std::endl;
             return false;
         }
         std::cout << "Client: Received server UDP port: " << serverPort << std::endl;
 
         // Create UDP socket
         _udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
-        if (_udpSocket == -1) return false;
+        if (_udpSocket == -1) {
+            std::cerr << "Client: Failed to create UDP socket. errno: " << strerror(errno) << std::endl;
+            return false;
+        }
 
         sockaddr_in clientAddr{};
         clientAddr.sin_family = AF_INET;
         clientAddr.sin_addr.s_addr = INADDR_ANY;
-        clientAddr.sin_port = 0;
+        clientAddr.sin_port = 0; // Bind to a random available port
 
         if (bind(_udpSocket, (sockaddr*)&clientAddr, sizeof(clientAddr)) == -1) {
+            std::cerr << "Client: Failed to bind UDP socket. errno: " << strerror(errno) << std::endl;
             close(_udpSocket);
             return false;
         }
 
         // Get client port and send to server
         socklen_t len = sizeof(clientAddr);
-        getsockname(_udpSocket, (sockaddr*)&clientAddr, &len);
+        if (getsockname(_udpSocket, (sockaddr*)&clientAddr, &len) == -1) {
+            std::cerr << "Client: Failed to get socket name for UDP port. errno: " << strerror(errno) << std::endl;
+            close(_udpSocket);
+            return false;
+        }
         int myPort = ntohs(clientAddr.sin_port);
-        if (send(_tcpSocket, &myPort, sizeof(myPort), 0) != sizeof(myPort)) return false;
-        std::cout << "Client: Sent own UDP port " << myPort << " to server." << std::endl;
+        std::cout << "Client: UDP socket bound to port: " << myPort << std::endl;
+
+        std::cout << "Client: Sending own UDP port " << myPort << " to server via TCP socket " << _tcpSocket << std::endl;
+        ssize_t sentBytes = send(_tcpSocket, &myPort, sizeof(myPort), 0);
+        if (sentBytes != sizeof(myPort)) {
+            std::cerr << "Client: Failed to send UDP port to server. Sent " << sentBytes << " bytes, expected " << sizeof(myPort) << ". errno: " << strerror(errno) << std::endl;
+            close(_udpSocket);
+            return false;
+        }
+        std::cout << "Client: Successfully sent own UDP port to server." << std::endl;
 
         // Get server IP from TCP
         sockaddr_in tcpServerAddr{};
         socklen_t tcpLen = sizeof(tcpServerAddr);
-        getpeername(_tcpSocket, (sockaddr*)&tcpServerAddr, &tcpLen);
+        if (getpeername(_tcpSocket, (sockaddr*)&tcpServerAddr, &tcpLen) == -1) {
+            std::cerr << "Client: Failed to get server IP address from TCP socket. errno: " << strerror(errno) << std::endl;
+            close(_udpSocket);
+            return false;
+        }
+        char serverIpStr[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &tcpServerAddr.sin_addr, serverIpStr, INET_ADDRSTRLEN);
+        std::cout << "Client: Server IP from TCP: " << serverIpStr << ", Server TCP Port: " << ntohs(tcpServerAddr.sin_port) << std::endl;
         
-        _remoteAddr = tcpServerAddr;
-        _remoteAddr.sin_port = htons(serverPort);
+        _remoteAddr = tcpServerAddr; // Copy IP
+        _remoteAddr.sin_port = htons(serverPort); // Set to server's UDP port
+        std::cout << "Client: Remote UDP address set to IP: " << serverIpStr << ", Port: " << serverPort << std::endl;
     }
     _connected = true;
     std::cout << (_isServer ? "Host" : "Client") << " UdpNetworkManager: UDP connected flag set to true." << std::endl;

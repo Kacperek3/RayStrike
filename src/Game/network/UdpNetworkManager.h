@@ -10,6 +10,8 @@
 #include <netinet/in.h>
 #include <cstring>
 #include <iostream>
+#include <arpa/inet.h>   
+
 
 class UdpNetworkManager {
 public:
