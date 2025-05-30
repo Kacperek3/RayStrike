@@ -1,7 +1,9 @@
 #include "GameplayStateGuest.h"
 
 #include <cmath>
-#include <iostream> // Required for std::cerr
+#include <iostream> // Required for std::cerr, std::cout
+#include <string>   // Required for std::string, std::stof, std::stoi
+#include <stdexcept> // Required for std::invalid_argument, std::out_of_range
 
 #define PI 3.14159f
 
@@ -198,41 +200,75 @@ void GameplayStateGuest::Update() {
     // Odbieranie i przetwarzanie wiadomości od hosta
     if (_udpManager && _udpManager->HasMessages()) {
         std::string msg = _udpManager->PopMessage();
-        // Przykładowe przetwarzanie wiadomości (prosty protokół)
-        // "pos_enemy;x;y"
-        // "fire_enemy;x;y;velX;velY"
-        // "health_enemy;value"
-        // "health_player;value"
-        // "round_over;winner_id"
-        // "restart_game"
+        std::cout << "Guest Received MSG: " << msg << std::endl; // LOG RAW MESSAGE
 
         size_t typeEnd = msg.find(';');
         if (typeEnd != std::string::npos) {
             std::string type = msg.substr(0, typeEnd);
             std::string data = msg.substr(typeEnd + 1);
+            std::cout << "Guest Parsed Type: [" << type << "], Data: [" << data << "]" << std::endl;
 
             if (type == "pos_enemy") {
                 size_t sep = data.find(';');
                 if (sep != std::string::npos) {
-                    float x = std::stof(data.substr(0, sep));
-                    float y = std::stof(data.substr(sep + 1));
-                    UpdateEnemyPosition({x, y});
+                    try {
+                        float x = std::stof(data.substr(0, sep));
+                        float y = std::stof(data.substr(sep + 1));
+                        std::cout << "Guest Applying pos_enemy: x=" << x << ", y=" << y << std::endl;
+                        UpdateEnemyPosition({x, y});
+                    } catch (const std::invalid_argument& ia) {
+                        std::cerr << "Guest ERR: Invalid argument for std::stof in pos_enemy: " << ia.what() << " | Data: " << data << std::endl;
+                    } catch (const std::out_of_range& oor) {
+                        std::cerr << "Guest ERR: Out of range for std::stof in pos_enemy: " << oor.what() << " | Data: " << data << std::endl;
+                    }
+                } else {
+                     std::cerr << "Guest ERR: Malformed pos_enemy message (no separator for coords): " << data << std::endl;
+                }
+            } else if (type == "gun_angle_enemy") {
+                try {
+                    float angle = std::stof(data);
+                    std::cout << "Guest Applying gun_angle_enemy: " << angle << std::endl;
+                    _enemy.render.gunSprite->setRotation(angle);
+                } catch (const std::invalid_argument& ia) {
+                    std::cerr << "Guest ERR: Invalid argument for std::stof in gun_angle_enemy: " << ia.what() << " | Data: " << data << std::endl;
+                } catch (const std::out_of_range& oor) {
+                    std::cerr << "Guest ERR: Out of range for std::stof in gun_angle_enemy: " << oor.what() << " | Data: " << data << std::endl;
                 }
             } else if (type == "fire_enemy") {
-                // Parsowanie danych pocisku i dodanie do _enemyBullets
-                // np. x;y;velX;velY
-                // Tutaj uproszczone, zakładamy, że host wysyła pełne dane
-                // Trzeba by zaimplementować deserializację
+                std::cout << "Guest Received fire_enemy. Data: " << data << std::endl;
+                // TODO: Implement full deserialization for enemy bullets
+                // Example format: "id;x;y;velX;velY;angle"
+                // For now, just logging. If host sends many/complex fire_enemy messages,
+                // and this part is slow or error-prone, it could delay other message processing.
             } else if (type == "health_enemy") {
-                _enemy.core.health = std::stoi(data);
+                try {
+                    _enemy.core.health = std::stoi(data);
+                     std::cout << "Guest Applied health_enemy: " << _enemy.core.health << std::endl;
+                } catch (const std::invalid_argument& ia) {
+                    std::cerr << "Guest ERR: Invalid argument for std::stoi in health_enemy: " << ia.what() << " | Data: " << data << std::endl;
+                } catch (const std::out_of_range& oor) {
+                    std::cerr << "Guest ERR: Out of range for std::stoi in health_enemy: " << oor.what() << " | Data: " << data << std::endl;
+                }
             } else if (type == "health_player") {
-                _player.core.health = std::stoi(data);
+                try {
+                    _player.core.health = std::stoi(data);
+                    std::cout << "Guest Applied health_player: " << _player.core.health << std::endl;
+                } catch (const std::invalid_argument& ia) {
+                    std::cerr << "Guest ERR: Invalid argument for std::stoi in health_player: " << ia.what() << " | Data: " << data << std::endl;
+                } catch (const std::out_of_range& oor) {
+                    std::cerr << "Guest ERR: Out of range for std::stoi in health_player: " << oor.what() << " | Data: " << data << std::endl;
+                }
             } else if (type == "round_over") {
+                std::cout << "Guest Received round_over. Winner ID: " << data << std::endl;
                 // Obsługa końca rundy
             } else if (type == "restart_game") {
+                std::cout << "Guest Received restart_game." << std::endl;
                 RoundInit();
+            } else {
+                std::cout << "Guest Received unknown message type: " << type << std::endl;
             }
-            // ... inne typy wiadomości
+        } else {
+            std::cerr << "Guest ERR: Received malformed message (no type separator ';'): " << msg << std::endl;
         }
     }
 
@@ -258,11 +294,12 @@ void GameplayStateGuest::Update() {
 }
 
 void GameplayStateGuest::UpdateEnemyPosition(sf::Vector2f newPosition) {
+    std::cout << "Guest LOG: UpdateEnemyPosition called with: x=" << newPosition.x << ", y=" << newPosition.y << std::endl;
     _enemy.core.hitbox.setPosition(newPosition);
     _enemy.render.bodySprite->setPosition(newPosition);
     UpdateGunTransform(_enemy.render.bodySprite, _enemy.render.gunSprite);
-    // Rotacja broni przeciwnika powinna być również synchronizowana
-    // UpdateGunRotation(_enemy.render.bodySprite, _enemy.render.gunSprite); 
+    // Enemy gun rotation should be updated by a separate message like \"gun_angle_enemy\"
+    // UpdateGunRotation(_enemy.render.bodySprite, _enemy.render.gunSprite); // This is for local player's gun based on mouse.
 }
 
 void GameplayStateGuest::UpdateGunTransform(sf::Sprite *targetSprite, sf::Sprite *gunSprite) {
