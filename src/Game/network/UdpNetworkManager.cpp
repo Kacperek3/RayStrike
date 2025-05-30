@@ -40,10 +40,39 @@ bool UdpNetworkManager::Initialize() {
     return true;
 }
 
+ssize_t UdpNetworkManager::recv_all(int sockfd, void *buf, size_t len, int flags) {
+    size_t total_received = 0;
+    char *p = static_cast<char*>(buf);
+
+    while (total_received < len) {
+        ssize_t received_now = recv(sockfd, p + total_received, len - total_received, flags);
+
+        if (received_now == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // Gniazdo nieblokujące, brak danych w tej chwili
+                // std::cout << "recv_all: Resource temporarily unavailable. Retrying..." << std::endl;
+                std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Krótkie opóźnienie przed ponowieniem
+                continue;
+            }
+            // Inny błąd
+            std::cerr << "recv_all failed with error: " << strerror(errno) << std::endl;
+            return -1;
+        } else if (received_now == 0) {
+            // Połączenie zamknięte przez drugą stronę
+            std::cerr << "recv_all: Connection closed by peer." << std::endl;
+            return 0; // lub -1 jeśli traktujemy to jako błąd w tym kontekście
+        }
+        total_received += received_now;
+    }
+    return total_received;
+}
+
+
 bool UdpNetworkManager::SetupUdpConnection() {
     std::cout << (_isServer ? "Host" : "Client") << " UdpNetworkManager: Setting up UDP connection..." << std::endl;
-    const int MAX_RECV_RETRIES = 100; // Retry up to 100 times
-    const std::chrono::milliseconds RECV_RETRY_DELAY(100); // Wait 100ms between retries
+    char ack_char = PORT_DATA_ACK; // Znak potwierdzenia
+    char received_ack_char = 0;    // Do przechowywania otrzymanego ACK
+    ssize_t bytes_processed;
 
     // Server side
     if (_isServer) {
@@ -64,7 +93,6 @@ bool UdpNetworkManager::SetupUdpConnection() {
             return false;
         }
 
-        // Get assigned port
         socklen_t len = sizeof(serverAddr);
         if (getsockname(_udpSocket, (sockaddr*)&serverAddr, &len) == -1) {
             std::cerr << "Host: Failed to get socket name for UDP port. errno: " << strerror(errno) << std::endl;
@@ -74,117 +102,56 @@ bool UdpNetworkManager::SetupUdpConnection() {
         int myPort = ntohs(serverAddr.sin_port);
         std::cout << "Host: UDP socket bound to port: " << myPort << std::endl;
 
-        // Send UDP port to client
+        // 1. Host sends its UDP port to Client
+        
         std::cout << "Host: Sending own UDP port " << myPort << " to client via TCP socket " << _tcpSocket << std::endl;
-        ssize_t sentBytes = send(_tcpSocket, &myPort, sizeof(myPort), 0);
-        if (sentBytes != sizeof(myPort)) {
-            std::cerr << "Host: Failed to send UDP port to client. Sent " << sentBytes << " bytes, expected " << sizeof(myPort) << ". errno: " << strerror(errno) << std::endl;
+        
+        //wait for the client to be ready
+        std::this_thread::sleep_for(std::chrono::milliseconds(700)); // Optional: wait for client to be ready
+        
+        bytes_processed = send(_tcpSocket, &myPort, sizeof(myPort), 0);
+        if (bytes_processed != sizeof(myPort)) {
+            std::cerr << "Host: Failed to send UDP port to client. Sent " << bytes_processed << ". errno: " << strerror(errno) << std::endl;
             close(_udpSocket);
             return false;
         }
-        std::cout << "Host: Successfully sent own UDP port to client." << std::endl;
 
-        // Wait for ACK from client that it received our port
-        char clientAck = 0;
-        ssize_t ackReceivedBytes = -1;
+        // 2. Host waits for ACK from Client (confirming Client received Host's port)
         std::cout << "Host: Waiting for ACK from client for host UDP port..." << std::endl;
-        for (int i = 0; i < MAX_RECV_RETRIES; ++i) {
-            ackReceivedBytes = recv(_tcpSocket, &clientAck, sizeof(clientAck), 0);
-            if (ackReceivedBytes == sizeof(clientAck)) {
-                if (clientAck == PORT_DATA_ACK) {
-                    break; // Correct ACK received
-                } else {
-                    std::cerr << "Host: Received incorrect ACK for host UDP port. Expected " << PORT_DATA_ACK << ", got " << (int)clientAck << " (char: '" << clientAck << "')." << std::endl;
-                    close(_udpSocket);
-                    return false; // Fatal error, incorrect ACK
-                }
-            }
-            if (ackReceivedBytes == -1) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    if (i < MAX_RECV_RETRIES - 1) {
-                        // std::cout << "Host: recv for client ACK (host port): Resource temporarily unavailable (attempt " << i + 1 << "/" << MAX_RECV_RETRIES << "). Retrying..." << std::endl;
-                    }
-                    std::this_thread::sleep_for(RECV_RETRY_DELAY);
-                    continue;
-                } else {
-                    std::cerr << "Host: recv failed when expecting ACK for host UDP port. errno: " << strerror(errno) << " (attempt " << i + 1 << ")" << std::endl;
-                    close(_udpSocket);
-                    return false;
-                }
-            } else if (ackReceivedBytes == 0) {
-                std::cerr << "Host: TCP connection closed by client while waiting for ACK for host UDP port." << std::endl;
-                close(_udpSocket);
-                return false;
-            } else { // Partial read
-                std::cerr << "Host: Received partial data for client ACK (host port). Expected " << sizeof(clientAck) << " bytes, got " << ackReceivedBytes << " (attempt " << i + 1 << "). Retrying..." << std::endl;
-                std::this_thread::sleep_for(RECV_RETRY_DELAY);
-            }
-        }
-
-        if (ackReceivedBytes != sizeof(clientAck) || clientAck != PORT_DATA_ACK) {
-            std::cerr << "Host: Failed to receive valid ACK for host UDP port after " << MAX_RECV_RETRIES << " retries. Last recv bytes: " << ackReceivedBytes << ", last ACK char: " << (int)clientAck << std::endl;
+        bytes_processed = recv_all(_tcpSocket, &received_ack_char, sizeof(received_ack_char), 0);
+        if (bytes_processed <= 0 || received_ack_char != ack_char) {
+            std::cerr << "Host: Failed to receive valid ACK for host UDP port. Bytes: " << bytes_processed << " Char: " << (int)received_ack_char << std::endl;
             close(_udpSocket);
             return false;
         }
         std::cout << "Host: Received ACK from client for host UDP port." << std::endl;
 
-        // Get client UDP port
+        // 3. Host waits to receive Client's UDP port
         int clientPort = 0;
         std::cout << "Host: Waiting to receive client UDP port via TCP socket " << _tcpSocket << std::endl;
-        ssize_t receivedBytes = -1;
-
-        for (int i = 0; i < MAX_RECV_RETRIES; ++i) {
-            receivedBytes = recv(_tcpSocket, &clientPort, sizeof(clientPort), 0);
-            if (receivedBytes == sizeof(clientPort)) {
-                break; // Successfully received the full port number
-            }
-            if (receivedBytes == -1) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    if (i < MAX_RECV_RETRIES - 1) {
-                        // std::cout << "Host: recv for client UDP port: Resource temporarily unavailable (attempt " << i + 1 << "/" << MAX_RECV_RETRIES << "). Retrying..." << std::endl;
-                    }
-                    std::this_thread::sleep_for(RECV_RETRY_DELAY);
-                    continue;
-                } else {
-                    std::cerr << "Host: recv failed when expecting client UDP port. errno: " << strerror(errno) << " (attempt " << i + 1 << ")" << std::endl;
-                    close(_udpSocket);
-                    return false;
-                }
-            } else if (receivedBytes == 0) {
-                std::cerr << "Host: TCP connection closed by client while waiting for client UDP port." << std::endl;
-                close(_udpSocket);
-                return false;
-            } else { // Partial read
-                std::cerr << "Host: Received partial data for client UDP port. Expected " << sizeof(clientPort) << " bytes, got " << receivedBytes << " (attempt " << i + 1 << "). Retrying..." << std::endl;
-                std::this_thread::sleep_for(RECV_RETRY_DELAY);
-            }
-        }
-
-        if (receivedBytes != sizeof(clientPort)) {
-            std::cerr << "Host: Failed to receive client UDP port after " << MAX_RECV_RETRIES << " retries." << std::endl;
-            if(receivedBytes == -1) {
-                 std::cerr << "Host: Last recv error for client UDP port: " << strerror(errno) << std::endl;
-            } else {
-                 std::cerr << "Host: Last received bytes for client UDP port: " << receivedBytes << " (expected " << sizeof(clientPort) << ")" << std::endl;
-            }
+        bytes_processed = recv_all(_tcpSocket, &clientPort, sizeof(clientPort), 0);
+         if (bytes_processed <= 0) { // recv_all zwróci -1 lub 0 przy błędzie/zamknięciu
+            std::cerr << "Host: Failed to receive client UDP port. recv_all returned " << bytes_processed << std::endl;
             close(_udpSocket);
             return false;
         }
-        // clientPort is now populated
         std::cout << "Host: Received client UDP port: " << clientPort << std::endl;
 
-        // Send ACK to client that we received their port
-        char hostAck = PORT_DATA_ACK;
+        // 4. Host sends ACK to Client (confirming Host received Client's port)
         std::cout << "Host: Sending ACK to client for client UDP port..." << std::endl;
-        sentBytes = send(_tcpSocket, &hostAck, sizeof(hostAck), 0);
-        if (sentBytes != sizeof(hostAck)) {
-            std::cerr << "Host: Failed to send ACK for client UDP port. Sent " << sentBytes << " bytes, expected " << sizeof(hostAck) << ". errno: " << strerror(errno) << std::endl;
+
+        //wait for the client to be ready
+        std::this_thread::sleep_for(std::chrono::milliseconds(700)); // Optional: wait for client to be ready
+
+        bytes_processed = send(_tcpSocket, &ack_char, sizeof(ack_char), 0);
+        if (bytes_processed != sizeof(ack_char)) {
+            std::cerr << "Host: Failed to send ACK for client UDP port. Sent " << bytes_processed << ". errno: " << strerror(errno) << std::endl;
             close(_udpSocket);
             return false;
         }
         std::cout << "Host: Successfully sent ACK for client UDP port." << std::endl;
 
-        // Get client IP from TCP
+        // Configure remote address for UDP
         sockaddr_in tcpClientAddr{};
         socklen_t tcpLen = sizeof(tcpClientAddr);
         if (getpeername(_tcpSocket, (sockaddr*)&tcpClientAddr, &tcpLen) == -1) {
@@ -194,86 +161,52 @@ bool UdpNetworkManager::SetupUdpConnection() {
         }
         char clientIpStr[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &tcpClientAddr.sin_addr, clientIpStr, INET_ADDRSTRLEN);
-        std::cout << "Host: Client IP from TCP: " << clientIpStr << ", Client TCP Port: " << ntohs(tcpClientAddr.sin_port) << std::endl;
         
-        _remoteAddr = tcpClientAddr; // Copy IP
-        _remoteAddr.sin_port = htons(clientPort); // Set to client's UDP port
+        _remoteAddr = tcpClientAddr;
+        _remoteAddr.sin_port = htons(clientPort);
         std::cout << "Host: Remote UDP address set to IP: " << clientIpStr << ", Port: " << clientPort << std::endl;
 
     }
     // Client side
     else {
-        // Get server UDP port
-        int serverPort = 0; // Initialize
-        ssize_t receivedBytes = -1;
+        // 1. Client waits to receive Host's UDP port
+        int serverPort;
         std::cout << "Client: Waiting to receive server UDP port via TCP socket " << _tcpSocket << std::endl;
-
-        for (int i = 0; i < MAX_RECV_RETRIES; ++i) {
-            receivedBytes = recv(_tcpSocket, &serverPort, sizeof(serverPort), 0);
-            if (receivedBytes == sizeof(serverPort)) {
-                break; // Successfully received the full port number
-            }
-            if (receivedBytes == -1) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    if (i < MAX_RECV_RETRIES - 1) {
-                        // std::cout << "Client: recv for server UDP port: Resource temporarily unavailable (attempt " << i + 1 << "/" << MAX_RECV_RETRIES << "). Retrying..." << std::endl;
-                    }
-                    std::this_thread::sleep_for(RECV_RETRY_DELAY);
-                    continue;
-                } else {
-                    std::cerr << "Client: recv failed when expecting server UDP port. errno: " << strerror(errno) << " (attempt " << i + 1 << ")" << std::endl;
-                    return false; // UDP socket not created yet
-                }
-            } else if (receivedBytes == 0) {
-                std::cerr << "Client: TCP connection closed by server while waiting for server UDP port." << std::endl;
-                return false; // UDP socket not created yet
-            } else { // Partial read
-                std::cerr << "Client: Received partial data for server UDP port. Expected " << sizeof(serverPort) << " bytes, got " << receivedBytes << " (attempt " << i + 1 << "). Retrying..." << std::endl;
-                std::this_thread::sleep_for(RECV_RETRY_DELAY);
-            }
-        }
-
-        if (receivedBytes != sizeof(serverPort)) {
-            std::cerr << "Client: Failed to receive server UDP port after " << MAX_RECV_RETRIES << " retries." << std::endl;
-            if(receivedBytes == -1) {
-                 std::cerr << "Client: Last recv error for server UDP port: " << strerror(errno) << std::endl;
-            } else {
-                 std::cerr << "Client: Last received bytes for server UDP port: " << receivedBytes << " (expected " << sizeof(serverPort) << ")" << std::endl;
-            }
-            return false; // UDP socket not created yet
+        bytes_processed = recv_all(_tcpSocket, &serverPort, sizeof(serverPort), 0);
+        if (bytes_processed <= 0) {
+            std::cerr << "Client: Failed to receive server UDP port. recv_all returned " << bytes_processed << std::endl;
+            return false;
         }
         std::cout << "Client: Received server UDP port: " << serverPort << std::endl;
 
-        // Send ACK to host that we received its port
-        char clientAck = PORT_DATA_ACK;
+        // 2. Client sends ACK to Host (confirming Client received Host's port)
         std::cout << "Client: Sending ACK to host for host UDP port..." << std::endl;
-        ssize_t ackSentBytes = send(_tcpSocket, &clientAck, sizeof(clientAck), 0);
-        if (ackSentBytes != sizeof(clientAck)) {
-            std::cerr << "Client: Failed to send ACK for host UDP port. Sent " << ackSentBytes << " bytes, expected " << sizeof(clientAck) << ". errno: " << strerror(errno) << std::endl;
-            // UDP socket not created yet, so no need to close it here
+        
+        //wait for the host to be ready
+        std::this_thread::sleep_for(std::chrono::milliseconds(700)); // Optional: wait for host to be ready
+
+        bytes_processed = send(_tcpSocket, &ack_char, sizeof(ack_char), 0);
+        if (bytes_processed != sizeof(ack_char)) {
+            std::cerr << "Client: Failed to send ACK for host UDP port. Sent " << bytes_processed << ". errno: " << strerror(errno) << std::endl;
             return false;
         }
         std::cout << "Client: Successfully sent ACK for host UDP port." << std::endl;
 
-        // Create UDP socket
+        // Create and bind client's UDP socket
         _udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
         if (_udpSocket == -1) {
             std::cerr << "Client: Failed to create UDP socket. errno: " << strerror(errno) << std::endl;
             return false;
         }
-
         sockaddr_in clientAddr{};
         clientAddr.sin_family = AF_INET;
         clientAddr.sin_addr.s_addr = INADDR_ANY;
-        clientAddr.sin_port = 0; // Bind to a random available port
-
+        clientAddr.sin_port = 0;
         if (bind(_udpSocket, (sockaddr*)&clientAddr, sizeof(clientAddr)) == -1) {
             std::cerr << "Client: Failed to bind UDP socket. errno: " << strerror(errno) << std::endl;
             close(_udpSocket);
             return false;
         }
-
-        // Get client port and send to server
         socklen_t len = sizeof(clientAddr);
         if (getsockname(_udpSocket, (sockaddr*)&clientAddr, &len) == -1) {
             std::cerr << "Client: Failed to get socket name for UDP port. errno: " << strerror(errno) << std::endl;
@@ -283,63 +216,30 @@ bool UdpNetworkManager::SetupUdpConnection() {
         int myPort = ntohs(clientAddr.sin_port);
         std::cout << "Client: UDP socket bound to port: " << myPort << std::endl;
 
-        //pause a bit to ensure the server is ready to receive
-        std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Wait a bit to ensure server is ready
-
+        // 3. Client sends its UDP port to Host
         std::cout << "Client: Sending own UDP port " << myPort << " to server via TCP socket " << _tcpSocket << std::endl;
-        ssize_t sentBytes = send(_tcpSocket, &myPort, sizeof(myPort), 0);
-        if (sentBytes != sizeof(myPort)) {
-            std::cerr << "Client: Failed to send UDP port to server. Sent " << sentBytes << " bytes, expected " << sizeof(myPort) << ". errno: " << strerror(errno) << std::endl;
+        
+        //wait for the host to be ready
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // Optional: wait for host to be ready
+
+        bytes_processed = send(_tcpSocket, &myPort, sizeof(myPort), 0);
+        if (bytes_processed != sizeof(myPort)) {
+            std::cerr << "Client: Failed to send UDP port to server. Sent " << bytes_processed << ". errno: " << strerror(errno) << std::endl;
             close(_udpSocket);
             return false;
         }
-        std::cout << "Client: Successfully sent own UDP port to server." << std::endl;
 
-        // Wait for ACK from host that it received our port
-        char hostAck = 0;
-        receivedBytes = -1; // Reset for this recv operation
+        // 4. Client waits for ACK from Host (confirming Host received Client's port)
         std::cout << "Client: Waiting for ACK from host for client UDP port..." << std::endl;
-        for (int i = 0; i < MAX_RECV_RETRIES; ++i) {
-            receivedBytes = recv(_tcpSocket, &hostAck, sizeof(hostAck), 0);
-            if (receivedBytes == sizeof(hostAck)) {
-                if (hostAck == PORT_DATA_ACK) {
-                    break; // Correct ACK received
-                } else {
-                    std::cerr << "Client: Received incorrect ACK for client UDP port. Expected " << PORT_DATA_ACK << ", got " << (int)hostAck << " (char: '" << hostAck << "')." << std::endl;
-                    close(_udpSocket);
-                    return false; // Fatal error, incorrect ACK
-                }
-            }
-            if (receivedBytes == -1) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    if (i < MAX_RECV_RETRIES - 1) {
-                        // std::cout << "Client: recv for host ACK (client port): Resource temporarily unavailable (attempt " << i + 1 << "/" << MAX_RECV_RETRIES << "). Retrying..." << std::endl;
-                    }
-                    std::this_thread::sleep_for(RECV_RETRY_DELAY);
-                    continue;
-                } else {
-                    std::cerr << "Client: recv failed when expecting ACK for client UDP port. errno: " << strerror(errno) << " (attempt " << i + 1 << ")" << std::endl;
-                    close(_udpSocket);
-                    return false;
-                }
-            } else if (receivedBytes == 0) {
-                std::cerr << "Client: TCP connection closed by host while waiting for ACK for client UDP port." << std::endl;
-                close(_udpSocket);
-                return false;
-            } else { // Partial read
-                std::cerr << "Client: Received partial data for host ACK (client port). Expected " << sizeof(hostAck) << " bytes, got " << receivedBytes << " (attempt " << i + 1 << "). Retrying..." << std::endl;
-                std::this_thread::sleep_for(RECV_RETRY_DELAY);
-            }
-        }
-
-        if (receivedBytes != sizeof(hostAck) || hostAck != PORT_DATA_ACK) {
-            std::cerr << "Client: Failed to receive valid ACK for client UDP port after " << MAX_RECV_RETRIES << " retries. Last recv bytes: " << receivedBytes << ", last ACK char: " << (int)hostAck << std::endl;
+        bytes_processed = recv_all(_tcpSocket, &received_ack_char, sizeof(received_ack_char), 0);
+        if (bytes_processed <= 0 || received_ack_char != ack_char) {
+            std::cerr << "Client: Failed to receive valid ACK for client UDP port. Bytes: " << bytes_processed << " Char: " << (int)received_ack_char << std::endl;
             close(_udpSocket);
             return false;
         }
         std::cout << "Client: Received ACK from host for client UDP port." << std::endl;
 
-        // Get server IP from TCP
+        // Configure remote address for UDP
         sockaddr_in tcpServerAddr{};
         socklen_t tcpLen = sizeof(tcpServerAddr);
         if (getpeername(_tcpSocket, (sockaddr*)&tcpServerAddr, &tcpLen) == -1) {
@@ -349,16 +249,22 @@ bool UdpNetworkManager::SetupUdpConnection() {
         }
         char serverIpStr[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &tcpServerAddr.sin_addr, serverIpStr, INET_ADDRSTRLEN);
-        std::cout << "Client: Server IP from TCP: " << serverIpStr << ", Server TCP Port: " << ntohs(tcpServerAddr.sin_port) << std::endl;
         
-        _remoteAddr = tcpServerAddr; // Copy IP
-        _remoteAddr.sin_port = htons(serverPort); // Set to server's UDP port
+        _remoteAddr = tcpServerAddr;
+        _remoteAddr.sin_port = htons(serverPort);
         std::cout << "Client: Remote UDP address set to IP: " << serverIpStr << ", Port: " << serverPort << std::endl;
     }
+
     _connected = true;
-    std::cout << (_isServer ? "Host" : "Client") << " UdpNetworkManager: UDP connected flag set to true." << std::endl;
+    std::cout << (_isServer ? "Host" : "Client") << " UdpNetworkManager: UDP connection handshake complete. Connected flag set to true." << std::endl;
+    // Gniazdo TCP (_tcpSocket) może zostać zamknięte tutaj, jeśli nie będzie już potrzebne.
+    // Jednakże, jeśli planujesz używać go do dalszej sygnalizacji (np. rozłączanie), zostaw je otwarte.
+    // Dla tego przykładu zakładam, że nie jest już potrzebne do komunikacji UDP.
+    // close(_tcpSocket); // Rozważ zamknięcie TCP po konfiguracji
+    // _tcpSocket = -1;
     return true;
 }
+
 
 void UdpNetworkManager::ReceiveThreadFunc() {
     char buffer[2048];

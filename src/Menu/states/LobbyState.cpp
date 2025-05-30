@@ -305,7 +305,6 @@ void LobbyState::HandleInput() {
                         AddMessageToChat(message, sf::Color(0, 255, 0, 120), 14, 90);
                         _networkLobbyManager->Send("__START_GAME__" + message);
                         // nowy state z grameplay
-                        sleep(1.5);
                         _data->stateManager.AddState(StateRef(new GameplayStateHost(_data,_config.serverSocketForClient)),false);
                     } 
                 }

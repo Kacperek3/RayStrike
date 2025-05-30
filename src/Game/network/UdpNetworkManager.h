@@ -23,7 +23,7 @@ public:
     bool HasMessages();
     std::string PopMessage();
     bool WaitForMessage(std::string& outMessage, int timeoutMs);
-
+    ssize_t recv_all(int sockfd, void *buf, size_t len, int flags); 
     bool IsConnected() const { return _connected; }
 
 private:
