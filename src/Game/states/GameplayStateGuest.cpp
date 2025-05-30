@@ -1,22 +1,30 @@
 #include "GameplayStateGuest.h"
 
 #include <cmath>
+#include <iostream> // Required for std::cerr
 
 #define PI 3.14159f
 
-GameplayStateGuest::GameplayStateGuest(GameDataRef data) : _data(data) {
+GameplayStateGuest::GameplayStateGuest(GameDataRef data, int tcpSocketClient) : _data(data), _tcpSocketClient(tcpSocketClient) {
     _windowSize = _data->window.getSize();
     _data->window.setMouseCursorVisible(false);
 
+    // Initialize UdpNetworkManager for Guest
+    _udpManager = new UdpNetworkManager(-1, _tcpSocketClient); // tcpSocketServer is -1 for client
+    if (!_udpManager->Initialize()) {
+        std::cerr << "Guest: Failed to initialize UdpNetworkManager. TCP Socket: " << _tcpSocketClient << std::endl;
+        // Handle this critical error. For now, logging.
+        // This could be the source of the hang if Initialize() blocks,
+        // or a crash if it returns false and _udpManager is used later without being valid.
+    }
+
+    // Initialize render objects (similar to GameplayStateHost)
     _player.render.indicatorText = new sf::Text();
     _enemy.render.indicatorText = new sf::Text();
-
     _roundOverText = new sf::Text();
     _restartText = new sf::Text();
-
     _player.render.bodySprite = new sf::Sprite();
     _player.render.gunSprite = new sf::Sprite();
-
     _enemy.render.bodySprite = new sf::Sprite();
     _enemy.render.gunSprite = new sf::Sprite();
 }
@@ -114,11 +122,12 @@ void GameplayStateGuest::HandleInput() {
     while (_data->window.pollEvent(event)) {
         if (event.type == sf::Event::Closed) {
             _data->window.close();
+            if (_udpManager) _udpManager->Send("disconnect"); // Informuj hosta o rozłączeniu
         }
 
         if (event.type == sf::Event::KeyPressed) {
            if (event.key.code == sf::Keyboard::H) {
-               _hitboxVisibility = !_hitboxVisibility;
+                _hitboxVisibility = !_hitboxVisibility;
            }
         }
 
@@ -131,6 +140,13 @@ void GameplayStateGuest::HandleInput() {
 
         if (event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left) {
             FireBullet(_player.render.bodySprite, _player.render.gunSprite);
+            // Wysłanie informacji o wystrzale do hosta
+            if (_udpManager) {
+                // Serializacja danych pocisku (pozycja, prędkość)
+                // Przykład: "fire;x;y;velX;velY"
+                // Tutaj uproszczone, wyślij tylko fakt wystrzału
+                _udpManager->Send("fire"); 
+            }
         }
     }
 
@@ -139,6 +155,7 @@ void GameplayStateGuest::HandleInput() {
     if (CheckWin()) {
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::R)) {
             RoundInit();
+            if (_udpManager) _udpManager->Send("restart_request");
         }
         return;
     }
@@ -147,10 +164,111 @@ void GameplayStateGuest::HandleInput() {
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) _player.core.velocity.y = _player.core.speed;
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) _player.core.velocity.x = -_player.core.speed;
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) _player.core.velocity.x = _player.core.speed;
+
+    // Wysłanie pozycji gracza do hosta
+    if (_udpManager && (_player.core.velocity.x != 0 || _player.core.velocity.y != 0)) {
+        std::string posMsg = "pos;" + std::to_string(_player.core.hitbox.getPosition().x) + ";" + std::to_string(_player.core.hitbox.getPosition().y);
+        _udpManager->Send(posMsg);
+    }
+}
+
+void GameplayStateGuest::Update() {
+    // Aktualizacja pozycji gracza
+    _player.core.hitbox.move(_player.core.velocity);
+    _player.render.bodySprite->setPosition(_player.core.hitbox.getPosition());
+    UpdateGunTransform(_player.render.bodySprite, _player.render.gunSprite);
+    UpdateGunRotation(_player.render.bodySprite, _player.render.gunSprite);
+
+    // Aktualizacja pocisków gracza
+    for (auto it = _bullets.begin(); it != _bullets.end();) {
+        it->sprite.move(it->velocity);
+        it->hitbox.setPosition(it->sprite.getPosition());
+        // Sprawdzenie kolizji z przeciwnikiem (hostem)
+        if (_enemy.core.hitbox.getGlobalBounds().intersects(it->hitbox.getGlobalBounds())) {
+            // Informacja o trafieniu może być wysłana do hosta lub host sam to wykryje
+            it = _bullets.erase(it);
+        } else if (it->sprite.getPosition().x < 0 || it->sprite.getPosition().x > _windowSize.x ||
+                   it->sprite.getPosition().y < 0 || it->sprite.getPosition().y > _windowSize.y) {
+            it = _bullets.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    // Odbieranie i przetwarzanie wiadomości od hosta
+    if (_udpManager && _udpManager->HasMessages()) {
+        std::string msg = _udpManager->PopMessage();
+        // Przykładowe przetwarzanie wiadomości (prosty protokół)
+        // "pos_enemy;x;y"
+        // "fire_enemy;x;y;velX;velY"
+        // "health_enemy;value"
+        // "health_player;value"
+        // "round_over;winner_id"
+        // "restart_game"
+
+        size_t typeEnd = msg.find(';');
+        if (typeEnd != std::string::npos) {
+            std::string type = msg.substr(0, typeEnd);
+            std::string data = msg.substr(typeEnd + 1);
+
+            if (type == "pos_enemy") {
+                size_t sep = data.find(';');
+                if (sep != std::string::npos) {
+                    float x = std::stof(data.substr(0, sep));
+                    float y = std::stof(data.substr(sep + 1));
+                    UpdateEnemyPosition({x, y});
+                }
+            } else if (type == "fire_enemy") {
+                // Parsowanie danych pocisku i dodanie do _enemyBullets
+                // np. x;y;velX;velY
+                // Tutaj uproszczone, zakładamy, że host wysyła pełne dane
+                // Trzeba by zaimplementować deserializację
+            } else if (type == "health_enemy") {
+                _enemy.core.health = std::stoi(data);
+            } else if (type == "health_player") {
+                _player.core.health = std::stoi(data);
+            } else if (type == "round_over") {
+                // Obsługa końca rundy
+            } else if (type == "restart_game") {
+                RoundInit();
+            }
+            // ... inne typy wiadomości
+        }
+    }
+
+    // Aktualizacja pocisków przeciwnika (otrzymanych z sieci)
+    for (auto it = _enemyBullets.begin(); it != _enemyBullets.end();) {
+        it->sprite.move(it->velocity);
+        it->hitbox.setPosition(it->sprite.getPosition());
+        // Sprawdzenie kolizji z graczem (klientem)
+        if (_player.core.hitbox.getGlobalBounds().intersects(it->hitbox.getGlobalBounds())) {
+            _player.core.health -= 10; // Przykładowe obrażenia
+            if (_udpManager) _udpManager->Send("hit_player"); // Informuj hosta o trafieniu
+            it = _enemyBullets.erase(it);
+        } else if (it->sprite.getPosition().x < 0 || it->sprite.getPosition().x > _windowSize.x ||
+                   it->sprite.getPosition().y < 0 || it->sprite.getPosition().y > _windowSize.y) {
+            it = _enemyBullets.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    DisplayPlayerData(_player);
+    DisplayPlayerData(_enemy);
 }
 
 void GameplayStateGuest::UpdateEnemyPosition(sf::Vector2f newPosition) {
+    _enemy.core.hitbox.setPosition(newPosition);
     _enemy.render.bodySprite->setPosition(newPosition);
+    UpdateGunTransform(_enemy.render.bodySprite, _enemy.render.gunSprite);
+    // Rotacja broni przeciwnika powinna być również synchronizowana
+    // UpdateGunRotation(_enemy.render.bodySprite, _enemy.render.gunSprite); 
+}
+
+void GameplayStateGuest::UpdateGunTransform(sf::Sprite *targetSprite, sf::Sprite *gunSprite) {
+    if (targetSprite && gunSprite) {
+        gunSprite->setPosition(targetSprite->getPosition());
+    }
 }
 
 // void GameplayStateGuest::UpdateEnemyBullets(const std::vector<Bullet>& newBullets) {
@@ -188,65 +306,63 @@ bool GameplayStateGuest::CheckWin() {
 }
 
 
-void GameplayStateGuest::Update() {
+// void GameplayStateGuest::Update() {
 
 
-    _enemy.core.hitbox.setPosition(_enemy.render.bodySprite->getPosition());
+//     _enemy.core.hitbox.setPosition(_enemy.render.bodySprite->getPosition());
 
-    _player.core.hitbox.move(_player.core.velocity);
-    _player.render.bodySprite->setPosition(_player.core.hitbox.getPosition());
+//     _player.core.hitbox.move(_player.core.velocity);
+//     _player.render.bodySprite->setPosition(_player.core.hitbox.getPosition());
+//     UpdateGunTransform(_player.render.bodySprite, _player.render.gunSprite);
+//     UpdateGunRotation(_player.render.bodySprite, _player.render.gunSprite);
 
+//     // Don't update gun position for enemy.
+//     _enemy.render.gunSprite->setPosition(_enemy.render.bodySprite->getPosition());
 
-    _player.render.gunSprite->setPosition(_player.render.bodySprite->getPosition());
-    UpdateGunRotation(_player.render.bodySprite, _player.render.gunSprite);
+//     float healthPercentage = static_cast<float>(_player.core.health) / 100.f;
+//     _player.render.healthBarFill.setSize(sf::Vector2f(56.f * healthPercentage, 6.f));
 
-    // Don't update gun position for enemy.
-    _enemy.render.gunSprite->setPosition(_enemy.render.bodySprite->getPosition());
+//     healthPercentage = static_cast<float>(_enemy.core.health) / 100.f;
+//     _enemy.render.healthBarFill.setSize(sf::Vector2f(56.f * healthPercentage, 6.f));
 
-    float healthPercentage = static_cast<float>(_player.core.health) / 100.f;
-    _player.render.healthBarFill.setSize(sf::Vector2f(56.f * healthPercentage, 6.f));
+//     DisplayPlayerData(_player);
+//     DisplayPlayerData(_enemy);
 
-    healthPercentage = static_cast<float>(_enemy.core.health) / 100.f;
-    _enemy.render.healthBarFill.setSize(sf::Vector2f(56.f * healthPercentage, 6.f));
+//     sf::Vector2f position = _player.render.bodySprite->getPosition();
+//     position.x = std::clamp(position.x, 0.f, static_cast<float>(_windowSize.x));
+//     position.y = std::clamp(position.y, 0.f, static_cast<float>(_windowSize.y));
+//     _player.render.bodySprite->setPosition(position);
 
-    DisplayPlayerData(_player);
-    DisplayPlayerData(_enemy);
+//     for (auto it = _bullets.begin(); it != _bullets.end();) {
+//         it->sprite.move(it->velocity);
+//         it->hitbox.setPosition(it->sprite.getPosition());
+//         bool bulletHit = false;
 
-    sf::Vector2f position = _player.render.bodySprite->getPosition();
-    position.x = std::clamp(position.x, 0.f, static_cast<float>(_windowSize.x));
-    position.y = std::clamp(position.y, 0.f, static_cast<float>(_windowSize.y));
-    _player.render.bodySprite->setPosition(position);
-
-    for (auto it = _bullets.begin(); it != _bullets.end();) {
-        it->sprite.move(it->velocity);
-        it->hitbox.setPosition(it->sprite.getPosition());
-        bool bulletHit = false;
-
-        sf::Vector2f bulletPos = it->sprite.getPosition();
-        sf::Vector2f enemyCenter = _enemy.core.hitbox.getPosition();
-        float distance = std::hypot(bulletPos.x - enemyCenter.x,
-                                  bulletPos.y - enemyCenter.y);
-        float sumRadius = _enemy.core.hitbox.getRadius() + it->sprite.getGlobalBounds().width/2;
-        if (distance <= sumRadius) {
-            _enemy.core.health = std::max(0, _enemy.core.health - 10);
-            bulletHit = true;
-        }
+//         sf::Vector2f bulletPos = it->sprite.getPosition();
+//         sf::Vector2f enemyCenter = _enemy.core.hitbox.getPosition();
+//         float distance = std::hypot(bulletPos.x - enemyCenter.x,
+//                                   bulletPos.y - enemyCenter.y);
+//         float sumRadius = _enemy.core.hitbox.getRadius() + it->sprite.getGlobalBounds().width/2;
+//         if (distance <= sumRadius) {
+//             _enemy.core.health = std::max(0, _enemy.core.health - 10);
+//             bulletHit = true;
+//         }
 
 
-        // Kolizja z granicami ekranu
-        sf::FloatRect bulletBounds = it->sprite.getGlobalBounds();
-        if (bulletBounds.left < -100 || bulletBounds.left > _windowSize.x + 100 ||
-            bulletBounds.top < -100 || bulletBounds.top > _windowSize.y + 100) {
-            bulletHit = true;
-            }
+//         // Kolizja z granicami ekranu
+//         sf::FloatRect bulletBounds = it->sprite.getGlobalBounds();
+//         if (bulletBounds.left < -100 || bulletBounds.left > _windowSize.x + 100 ||
+//             bulletBounds.top < -100 || bulletBounds.top > _windowSize.y + 100) {
+//             bulletHit = true;
+//             }
 
-        if (bulletHit) {
-            it = _bullets.erase(it);
-        } else {
-            ++it;
-        }
-    }
-}
+//         if (bulletHit) {
+//             it = _bullets.erase(it);
+//         } else {
+//             ++it;
+//         }
+//     }
+// }
 
 
 void GameplayStateGuest::FireBullet(sf::Sprite* sourceSprite, sf::Sprite* gunSprite) {

@@ -1,5 +1,7 @@
 #include "LobbyState.h"
 #include "GameplayTestState.h"
+#include "GameplayStateGuest.h"
+#include "GameplayStateHost.h"
 
 LobbyState::LobbyState(const LobbyConfig config) : _config(config), _data(config.data) {
     srand(static_cast<unsigned>(time(NULL)));
@@ -304,7 +306,7 @@ void LobbyState::HandleInput() {
                         _networkLobbyManager->Send("__START_GAME__" + message);
                         // nowy state z grameplay
                         sleep(1.5);
-                        _data->stateManager.AddState(StateRef(new GameplayTestState(_data,_config.serverSocketForClient, _config.clientSocket)),false);
+                        _data->stateManager.AddState(StateRef(new GameplayStateHost(_data,_config.serverSocketForClient)),false);
                     } 
                 }
                 else if (_readyGameButton->getGlobalBounds().contains(mousePos) && !_config.isHost) {
@@ -321,8 +323,9 @@ void LobbyState::HandleInput() {
                         AddMessageToChat(message, sf::Color(0, 255, 0, 120), 14, 90);
                         _networkLobbyManager->Send("__START_GAME__" + message);
                         // nowy state z grameplay
+                        sleep(1.5);
                         std::cout << "klient odpala pierwszy wbija i wysyla info" << std::endl;
-                        _data->stateManager.AddState(StateRef(new GameplayTestState(_data,_config.serverSocketForClient, _config.clientSocket)),false);
+                        _data->stateManager.AddState(StateRef(new GameplayStateGuest(_data, _config.clientSocket)),false);
                     } 
                 }
                 else if (_configureButton->getGlobalBounds().contains(mousePos) && _config.isHost) {
@@ -535,8 +538,13 @@ void LobbyState::Update() {
                 std::string receivedMessage = msg.substr(pos + prefix.length());
                 AddMessageToChat(receivedMessage, sf::Color(0, 255, 0, 120), 14, 90);
             }
-            _data->stateManager.AddState(StateRef(new GameplayTestState(_data,_config.serverSocketForClient, _config.clientSocket)), false);
-            //_animationState = AnimationState::EXITING;
+            if(_config.isHost)
+                _data->stateManager.AddState(StateRef(new GameplayStateHost(_data,_config.serverSocketForClient)), false);
+            else
+                _data->stateManager.AddState(StateRef(new GameplayStateGuest(_data, _config.clientSocket)), false);
+
+
+             //_animationState = AnimationState::EXITING;
         }
     }
 }

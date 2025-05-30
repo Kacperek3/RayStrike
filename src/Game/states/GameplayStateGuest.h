@@ -2,10 +2,11 @@
 #include "Game.h"
 #include "State.h"
 #include <vector>
+#include "../network/UdpNetworkManager.h"
 
 class GameplayStateGuest : public State {
 public:
-    GameplayStateGuest(GameDataRef data);
+    GameplayStateGuest(GameDataRef data, int tcpSocketClient = -1);
     ~GameplayStateGuest();
     void Init() override;
     void HandleInput() override;
@@ -46,9 +47,11 @@ private:
     Player _player;
     Player _enemy;
     std::vector<Bullet> _bullets;
+    std::vector<Bullet> _enemyBullets;
     sf::Vector2u _windowSize;
 
     Crosshair _crosshair;
+    UdpNetworkManager* _udpManager;
 
     sf::Text *_roundOverText;
     sf::Text *_restartText;
@@ -57,7 +60,7 @@ private:
     sf::Vector2f _mousePosition;
 
     bool _hitboxVisibility = false;
-
+    int _tcpSocketClient;
 
     void UpdateEnemyPosition(sf::Vector2f newPosition);
     void UpdateEnemyBullets(const std::vector<Bullet>& newBullets);
