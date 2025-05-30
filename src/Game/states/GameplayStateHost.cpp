@@ -4,10 +4,15 @@
 #include <sstream> // For string stream
 #include <iomanip> // For std::fixed and std::setprecision
 #include <iostream> // Required for std::cerr
+#include <chrono> // Required for std::chrono::milliseconds
 
 #define PI 3.14159f
 
-GameplayStateHost::GameplayStateHost(GameDataRef data, int tcpSocketServer) : _data(data), _tcpSocketServer(tcpSocketServer) {
+GameplayStateHost::GameplayStateHost(GameDataRef data, int tcpSocketServer) 
+    : _data(data), 
+      _tcpSocketServer(tcpSocketServer),
+      _networkThreadRunning(false) // Initialize atomic bool
+{
     _windowSize = _data->window.getSize();
     _data->window.setMouseCursorVisible(false);
 
@@ -21,16 +26,23 @@ GameplayStateHost::GameplayStateHost(GameDataRef data, int tcpSocketServer) : _d
     _enemy.render.gunSprite = new sf::Sprite();
 
     // Initialize UdpNetworkManager for Host
-    // Assuming _data->tcpSocketServer holds the listening socket descriptor for TCP
-    // For UdpNetworkManager, the second argument (tcpSocketClient) is not used by the server side during UDP setup.
     _udpManager = new UdpNetworkManager(_tcpSocketServer, -1); 
     if (!_udpManager->Initialize()) {
-        std::cerr << "Host: Failed to initialize UdpNetworkManager. TCP Socket: " << _tcpSocketServer << std::endl;
-        // TODO: Handle error properly, e.g., by transitioning to an error state or shutting down.
+        std::cerr << "Host: UdpNetworkManager initialization failed!" << std::endl;
+        // Handle initialization failure, maybe throw an exception or set an error state
+    } else {
+        // Start the network thread only if UDP manager initialized successfully
+        _networkThreadRunning = true;
+        _networkThread = std::thread(&GameplayStateHost::NetworkThreadFunc, this);
     }
 }
 
 GameplayStateHost::~GameplayStateHost() {
+    _networkThreadRunning = false;
+    if (_networkThread.joinable()) {
+        _networkThread.join();
+    }
+
     delete _player.render.indicatorText;
     delete _enemy.render.indicatorText;
     delete _roundOverText;
@@ -76,6 +88,7 @@ void GameplayStateHost::InitPlayer(Player &p, float x, float y, bool isHost, con
 
 
 void GameplayStateHost::RoundInit() {
+    std::lock_guard<std::mutex> lock(_gameStateMutex); // Lock before modifying shared data
     _player.core.health = 100;
     _enemy.core.health = 100;
     _bullets.clear();
@@ -86,8 +99,8 @@ void GameplayStateHost::RoundInit() {
     InitPlayer(_player, _windowSize.x - 100, _windowSize.y / 2, true, "Host", "player", "pgun");
     InitPlayer(_enemy, 100, _windowSize.y / 2, false, "Guest", "enemy", "egun");
     
-    // Send initial state to guest
-    SendGameStateToGuest();
+    // Initial state send can be triggered by the network thread or here with a lock
+    // SendGameStateToGuest(); // Consider if this should be immediate or handled by network thread
 }
 
 void GameplayStateHost::Init() {
@@ -160,6 +173,9 @@ void GameplayStateHost::HandleInput() {
 }
 
 void GameplayStateHost::ProcessGuestMessage(const std::string& msg) {
+    // This function will be called from the network thread, so lock access to shared game state
+    std::lock_guard<std::mutex> lock(_gameStateMutex);
+
     std::cout << "Host received: " << msg << std::endl;
     size_t typeEnd = msg.find(';');
     if (typeEnd == std::string::npos) return; // Invalid message format
@@ -207,6 +223,9 @@ void GameplayStateHost::ProcessGuestMessage(const std::string& msg) {
 }
 
 void GameplayStateHost::SendGameStateToGuest() {
+    // This function will be called from the network thread, so lock access to shared game state
+    std::lock_guard<std::mutex> lock(_gameStateMutex);
+
     if (!_udpManager || !_udpManager->IsConnected()) return;
 
     std::ostringstream oss;
@@ -246,70 +265,118 @@ void GameplayStateHost::SendGameStateToGuest() {
 
 
 void GameplayStateHost::Update() {
+    // Game logic updates remain in the main thread.
+    // Network operations (send/receive) are handled by _networkThread.
+
     if (_roundOver) {
-        // If guest requested restart and host also pressed R (handled in HandleInput)
-        // or if host alone presses R
-        return; 
-    }
-
-    // --- Network: Receive messages from Guest ---
-    if (_udpManager && _udpManager->HasMessages()) {
-        ProcessGuestMessage(_udpManager->PopMessage());
-    }
-
-    // --- Update Host Player ---
-    _player.core.hitbox.move(_player.core.velocity);
-    // Clamp player position to screen bounds
-    sf::Vector2f pos = _player.core.hitbox.getPosition();
-    pos.x = std::clamp(pos.x, _player.core.hitbox.getRadius(), _windowSize.x - _player.core.hitbox.getRadius());
-    pos.y = std::clamp(pos.y, _player.core.hitbox.getRadius(), _windowSize.y - _player.core.hitbox.getRadius());
-    _player.core.hitbox.setPosition(pos);
-    _player.render.bodySprite->setPosition(_player.core.hitbox.getPosition());
-    UpdateGunTransform(_player.render.bodySprite, _player.render.gunSprite);
-    UpdateGunRotation(_player.render.bodySprite, _player.render.gunSprite, _mousePosition);
-
-
-    // --- Update Guest Player (Enemy) ---
-    // Position is updated via network messages.
-    // Gun rotation for enemy should also be sent by guest or interpolated.
-    // For now, let's assume guest sends its gun angle.
-     _enemy.render.bodySprite->setPosition(_enemy.core.hitbox.getPosition()); // Ensure sprite follows hitbox
-     UpdateGunTransform(_enemy.render.bodySprite, _enemy.render.gunSprite);
-    // UpdateGunRotation(_enemy.render.bodySprite, _enemy.render.gunSprite, _enemy.core.mousePosition); // Needs _enemy.core.mousePosition from network
-
-
-    // --- Update Bullets ---
-    for (auto it = _bullets.begin(); it != _bullets.end();) {
-        it->sprite.move(it->velocity);
-        it->hitbox.setPosition(it->sprite.getPosition());
-        
-        // Check off-screen
-        if (it->sprite.getPosition().x < -50 || it->sprite.getPosition().x > _windowSize.x + 50 ||
-            it->sprite.getPosition().y < -50 || it->sprite.getPosition().y > _windowSize.y + 50) {
-            it = _bullets.erase(it);
-            continue;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::R)) {
+            if (_guestRestartRequested) {
+                RoundInit(); // Host and guest both ready
+            } else {
+                // Host wants to restart, could send a message if guest needs to confirm
+                // For now, assume host can unilaterally decide to restart if guest also pressed R (which sets _guestRestartRequested)
+                // Or, if we want host to initiate, send a "restart_request" and wait for guest "restart_ack"
+            }
         }
-        ++it;
+        // Display round over messages, etc.
+        return; // Don't process game logic if round is over
+    }
+
+    // --- Update Host Player (Main Thread) ---
+    {
+        std::lock_guard<std::mutex> lock(_gameStateMutex); // Lock for reading/writing player data
+        _player.core.hitbox.move(_player.core.velocity);
+        // Clamp player position to screen bounds
+        sf::Vector2f pos = _player.core.hitbox.getPosition();
+        pos.x = std::clamp(pos.x, _player.core.hitbox.getRadius(), _windowSize.x - _player.core.hitbox.getRadius());
+        pos.y = std::clamp(pos.y, _player.core.hitbox.getRadius(), _windowSize.y - _player.core.hitbox.getRadius());
+        _player.core.hitbox.setPosition(pos);
+        _player.render.bodySprite->setPosition(_player.core.hitbox.getPosition());
+        UpdateGunTransform(_player.render.bodySprite, _player.render.gunSprite);
+        UpdateGunRotation(_player.render.bodySprite, _player.render.gunSprite, _mousePosition);
+    }
+
+
+    // --- Update Guest Player (Enemy) (Main Thread, based on data from network thread) ---
+    {
+        std::lock_guard<std::mutex> lock(_gameStateMutex); // Lock for reading enemy data
+        _enemy.render.bodySprite->setPosition(_enemy.core.hitbox.getPosition());
+        UpdateGunTransform(_enemy.render.bodySprite, _enemy.render.gunSprite);
+        // Gun rotation for enemy is updated by ProcessGuestMessage
+    }
+
+
+    // --- Update Bullets (Main Thread) ---
+    {
+        std::lock_guard<std::mutex> lock(_gameStateMutex); // Lock for accessing bullets vector
+        for (auto it = _bullets.begin(); it != _bullets.end();) {
+            it->sprite.move(it->velocity);
+            it->hitbox.setPosition(it->sprite.getPosition());
+
+            // Remove bullets that go off-screen
+            if (it->sprite.getPosition().x < 0 || it->sprite.getPosition().x > _windowSize.x ||
+                it->sprite.getPosition().y < 0 || it->sprite.getPosition().y > _windowSize.y) {
+                it = _bullets.erase(it);
+            } else {
+                ++it;
+            }
+        }
     }
     
-    HandleCollisions();
-
-
-    // --- Check Win Condition ---
-    if (!_roundOver && CheckWin()) {
-        _roundOver = true;
-        // Winner determination logic can be here or in SendGameStateToGuest
+    // HandleCollisions and CheckWin might also need locking if they modify shared state
+    // that the network thread might also read (e.g. for sending game over state)
+    {
+        std::lock_guard<std::mutex> lock(_gameStateMutex);
+        HandleCollisions();
+        if (!_roundOver && CheckWin()) {
+            _roundOver = true;
+            // Network thread will pick up _roundOver state and send it
+        }
     }
 
-    // --- Update UI elements ---
-    DisplayPlayerData(_player);
-    DisplayPlayerData(_enemy);
+    // --- Update UI elements (Main Thread) ---
+    // These typically read game state, so lock if that state can be modified by network thread
+    // Or, make copies of data needed for UI if contention is an issue.
+    {
+        std::lock_guard<std::mutex> lock(_gameStateMutex);
+        DisplayPlayerData(_player);
+        DisplayPlayerData(_enemy);
+    }
 
-    // --- Network: Send updated game state to Guest ---
-    SendGameStateToGuest();
+    // Network sending is now handled by the NetworkThreadFunc
+    // SendGameStateToGuest(); // REMOVED FROM HERE
+}
+
+void GameplayStateHost::NetworkThreadFunc() {
+    std::cout << "Host: NetworkThreadFunc started." << std::endl;
+    while (_networkThreadRunning) {
+        if (_udpManager && _udpManager->IsConnected()) {
+            // Receive messages from Guest
+            while (_udpManager->HasMessages()) {
+                std::string msg = _udpManager->PopMessage();
+                if (!msg.empty()) {
+                    ProcessGuestMessage(msg); // ProcessGuestMessage handles its own locking
+                }
+            }
+
+            // Send game state to Guest periodically
+            SendGameStateToGuest(); // SendGameStateToGuest handles its own locking
+
+        } else {
+            if (!_udpManager) {
+                std::cerr << "Host: NetworkThreadFunc: _udpManager is null!" << std::endl;
+            } else if (!_udpManager->IsConnected()){
+                // std::cerr << "Host: NetworkThreadFunc: UDP manager not connected." << std::endl;
+            }
+        }
+        // Control the frequency of network updates
+        std::this_thread::sleep_for(std::chrono::milliseconds(16)); // Approx 60 updates/sec
+    }
+    std::cout << "Host: NetworkThreadFunc ended." << std::endl;
 }
 
 void GameplayStateHost::HandleCollisions() {
+    // Assumes _gameStateMutex is already locked by the caller (Update method)
     for (auto it = _bullets.begin(); it != _bullets.end();) {
         bool hit = false;
         // Collision: Host's bullets with Guest
@@ -333,6 +400,7 @@ void GameplayStateHost::HandleCollisions() {
 
 
 void GameplayStateHost::FireBullet(Player& shooter, sf::Sprite* gunSprite, float angleDegrees, bool isHostBullet) {
+    std::lock_guard<std::mutex> lock(_gameStateMutex); // Lock when modifying bullets vector
     Bullet newBullet;
     newBullet.sprite.setTexture(_data->assetManager.GetTexture(isHostBullet ? "bulletBlue" : "bulletRed"));
     newBullet.ownerId = isHostBullet ? 0 : 1;
@@ -388,6 +456,7 @@ void GameplayStateHost::DisplayPlayerData(Player &p) {
 }
 
 bool GameplayStateHost::CheckWin() {
+    // Assumes _gameStateMutex is already locked by the caller (Update method)
     return _player.core.health <= 0 || _enemy.core.health <= 0;
 }
 
@@ -412,7 +481,7 @@ void GameplayStateHost::DrawCustomCrosshair() {
     line.setPosition(_mousePosition.x, _mousePosition.y - gap);
     _data->window.draw(line);
     // ... (rest of the crosshair drawing logic)
-     line.setOrigin(lineThickness / 2, 0);
+    line.setOrigin(lineThickness / 2, 0);
     line.setPosition(_mousePosition.x, _mousePosition.y + gap);
     _data->window.draw(line);
 
@@ -427,9 +496,10 @@ void GameplayStateHost::DrawCustomCrosshair() {
 }
 
 void GameplayStateHost::Draw() {
-    _data->window.clear(sf::Color(30,30,30)); // Dark background
+    _data->window.clear();
+    std::lock_guard<std::mutex> lock(_gameStateMutex); // Lock for drawing shared game state
 
-    // Draw Player (Host)
+
     _data->window.draw(*_player.render.gunSprite);
     _data->window.draw(*_player.render.bodySprite);
     _data->window.draw(*_player.render.indicatorText);

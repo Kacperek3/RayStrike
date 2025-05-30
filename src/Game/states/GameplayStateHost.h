@@ -3,6 +3,9 @@
 #include "Game.h"
 #include "State.h"
 #include <vector>
+#include <thread> // Added for std::thread
+#include <atomic> // Added for std::atomic
+#include <mutex>  // Added for std::mutex
 #include "UdpNetworkManager.h"
 
 class GameplayStateHost : public State {
@@ -69,6 +72,11 @@ private:
 
     bool _hitboxVisibility = false;
 
+    // Network Threading
+    std::thread _networkThread;
+    std::atomic<bool> _networkThreadRunning;
+    std::mutex _gameStateMutex; // Mutex to protect shared game state data
+
     // Initialization and Update helpers
     void InitPlayer(Player &p, float x, float y, bool isHost, const std::string& name, const std::string& playerTexture, const std::string& gunTexture);
     void RoundInit();
@@ -85,4 +93,7 @@ private:
 
     bool CheckWin(); // Returns true if a player's health is 0
     void HandleCollisions();
+
+    // Network thread function
+    void NetworkThreadFunc();
 };
