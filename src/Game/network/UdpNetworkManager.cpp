@@ -81,22 +81,59 @@ bool UdpNetworkManager::SetupUdpConnection() {
         std::cout << "Host: Successfully sent own UDP port to client." << std::endl;
 
         // Get client UDP port
-        int clientPort;
+        int clientPort = 0; // Initialize to avoid using uninitialized value in logs if recv fails early
         std::cout << "Host: Waiting to receive client UDP port via TCP socket " << _tcpSocket << std::endl;
-        ssize_t receivedBytes = recv(_tcpSocket, &clientPort, sizeof(clientPort), 0);
-        if (receivedBytes == -1) {
-            std::cerr << "Host: recv failed when expecting client UDP port. errno: " << strerror(errno) << std::endl;
-            close(_udpSocket);
-            return false;
-        } else if (receivedBytes == 0) {
-            std::cerr << "Host: TCP connection possibly closed by client while waiting for client UDP port (recv returned 0)." << std::endl;
-            close(_udpSocket);
-            return false;
-        } else if (receivedBytes != sizeof(clientPort)) {
-            std::cerr << "Host: Failed to receive full client UDP port. Expected " << sizeof(clientPort) << " bytes, got " << receivedBytes << ". errno: " << strerror(errno) << std::endl;
+        
+        const int MAX_RECV_RETRIES = 100; // Retry up to 100 times
+        const std::chrono::milliseconds RECV_RETRY_DELAY(10); // Wait 10ms between retries
+        ssize_t receivedBytes = -1;
+
+        for (int i = 0; i < MAX_RECV_RETRIES; ++i) {
+            receivedBytes = recv(_tcpSocket, &clientPort, sizeof(clientPort), 0);
+            
+            if (receivedBytes == sizeof(clientPort)) {
+                break; // Successfully received the full port number
+            }
+            
+            if (receivedBytes == -1) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    // Data not yet available, socket is non-blocking
+                    if (i < MAX_RECV_RETRIES - 1) { // Log retries, but not the last attempt if it also fails
+                         // std::cout << "Host: recv for client UDP port: Resource temporarily unavailable (attempt " << i + 1 << "/" << MAX_RECV_RETRIES << "). Retrying..." << std::endl;
+                    }
+                    std::this_thread::sleep_for(RECV_RETRY_DELAY);
+                    continue; // Retry
+                } else {
+                    // A different, more serious error occurred
+                    std::cerr << "Host: recv failed when expecting client UDP port. errno: " << strerror(errno) << " (attempt " << i + 1 << ")" << std::endl;
+                    close(_udpSocket);
+                    return false;
+                }
+            } else if (receivedBytes == 0) {
+                // TCP connection was closed by the client
+                std::cerr << "Host: TCP connection closed by client while waiting for client UDP port (recv returned 0)." << std::endl;
+                close(_udpSocket);
+                return false;
+            } else { // receivedBytes > 0 but not sizeof(clientPort)
+                // Partial read, which is unusual for a small fixed-size piece of data like an int over TCP.
+                // Treat as an error or retry. For simplicity, we'll log and let the loop retry.
+                std::cerr << "Host: Received partial data for client UDP port. Expected " << sizeof(clientPort) << " bytes, got " << receivedBytes << " (attempt " << i + 1 << "). Retrying..." << std::endl;
+                std::this_thread::sleep_for(RECV_RETRY_DELAY);
+                // Potentially, one could try to read the remaining bytes, but for an int, a full retry is simpler.
+            }
+        }
+
+        if (receivedBytes != sizeof(clientPort)) {
+            std::cerr << "Host: Failed to receive client UDP port after " << MAX_RECV_RETRIES << " retries." << std::endl;
+            if(receivedBytes == -1) {
+                 std::cerr << "Host: Last recv error: " << strerror(errno) << std::endl;
+            } else {
+                 std::cerr << "Host: Last received bytes: " << receivedBytes << " (expected " << sizeof(clientPort) << ")" << std::endl;
+            }
             close(_udpSocket);
             return false;
         }
+        // clientPort is now populated
         std::cout << "Host: Received client UDP port: " << clientPort << std::endl;
 
         // Get client IP from TCP
@@ -161,6 +198,9 @@ bool UdpNetworkManager::SetupUdpConnection() {
         }
         int myPort = ntohs(clientAddr.sin_port);
         std::cout << "Client: UDP socket bound to port: " << myPort << std::endl;
+
+        //pause a bit to ensure the server is ready to receive
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Wait a bit to ensure server is ready
 
         std::cout << "Client: Sending own UDP port " << myPort << " to server via TCP socket " << _tcpSocket << std::endl;
         ssize_t sentBytes = send(_tcpSocket, &myPort, sizeof(myPort), 0);
