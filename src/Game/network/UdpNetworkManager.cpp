@@ -104,10 +104,13 @@ bool UdpNetworkManager::SetupUdpConnection() {
         
         std::cout << "Host: Sending own UDP port " << myPort << " to client via TCP socket " << _tcpSocket << std::endl;
         
-        //wait for the client to be ready
-        std::this_thread::sleep_for(std::chrono::milliseconds(1200)); // Optional: wait for client to be ready
+        for(int i = 0; i < 5; ++i) {
+            std::cout << "Host: Attempting to send own UDP port to client, attempt " << (i + 1) << std::endl;
+            std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Wait a bit before retrying
+            bytes_processed = send(_tcpSocket, &myPort, sizeof(myPort), 0);
+        }
         
-        bytes_processed = send(_tcpSocket, &myPort, sizeof(myPort), 0);
+        
         if (bytes_processed != sizeof(myPort)) {
             std::cerr << "Host: Failed to send UDP port to client. Sent " << bytes_processed << ". errno: " << strerror(errno) << std::endl;
             close(_udpSocket);

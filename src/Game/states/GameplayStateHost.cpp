@@ -462,7 +462,6 @@ void GameplayStateHost::FireBullet(Player& shooter, sf::Sprite* gunSprite, float
     newBullet.sprite.setTexture(_data->assetManager.GetTexture(isHostBullet ? "bulletBlue" : "bulletRed"));
     newBullet.ownerId = isHostBullet ? 0 : 1;
 
-    std::cout << angleDegrees * 2 << std::endl; // Debug log for angle
 
     float angleRad = angleDegrees * PI / 180.f;
     float gunLength = gunSprite->getGlobalBounds().width * gunSprite->getScale().x; // Consider scale

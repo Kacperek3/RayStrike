@@ -305,6 +305,7 @@ void LobbyState::HandleInput() {
                         AddMessageToChat(message, sf::Color(0, 255, 0, 120), 14, 90);
                         _networkLobbyManager->Send("__START_GAME__" + message);
                         // nowy state z grameplay
+                        std::this_thread::sleep_for(std::chrono::seconds(1)); // wait for 5 seconds before starting the game
                         _data->stateManager.AddState(StateRef(new GameplayStateHost(_data,_config.serverSocketForClient)),false);
                     } 
                 }
@@ -536,8 +537,10 @@ void LobbyState::Update() {
                 std::string receivedMessage = msg.substr(pos + prefix.length());
                 AddMessageToChat(receivedMessage, sf::Color(0, 255, 0, 120), 14, 90);
             }
-            if(_config.isHost)
+            if(_config.isHost){
+                std::this_thread::sleep_for(std::chrono::seconds(3));
                 _data->stateManager.AddState(StateRef(new GameplayStateHost(_data,_config.serverSocketForClient)), false);
+            }
             else
                 _data->stateManager.AddState(StateRef(new GameplayStateGuest(_data, _config.clientSocket)), false);
 

@@ -40,8 +40,8 @@ GameplayStateGuest::GameplayStateGuest(GameDataRef data, int tcpSocketClient) : 
 
 void GameplayStateGuest::RoundInit() {
 
-    _player.core.hitbox.setPosition(_windowSize.x - 100, _windowSize.y / 2);
-    _enemy.core.hitbox.setPosition(0 + 100, _windowSize.y / 2);
+    _enemy.core.hitbox.setPosition(_windowSize.x - 100, _windowSize.y / 2);
+    _player.core.hitbox.setPosition(0 + 100, _windowSize.y / 2);
 
     _player.core.health = 100;
     _enemy.core.health = 100;
@@ -93,12 +93,12 @@ void GameplayStateGuest::Init() {
     _player.render.bodySprite->setTexture(_data->assetManager.GetTexture("player"));
     _player.render.gunSprite->setTexture(_data->assetManager.GetTexture("pgun"));
     _player.render.indicatorText->setString("You");
-    InitPlayer(_player, _windowSize.x - 100, _windowSize.y / 2);
-
+    InitPlayer(_player, 0+100, _windowSize.y / 2);
+    
     _enemy.render.bodySprite->setTexture(_data->assetManager.GetTexture("enemy"));
     _enemy.render.gunSprite->setTexture(_data->assetManager.GetTexture("egun"));
     _enemy.render.indicatorText->setString("Enemy");
-    InitPlayer(_enemy, 0 + 100, _windowSize.y / 2);
+    InitPlayer(_enemy, _windowSize.x - 100, _windowSize.y / 2);
 
     _windowSize = _data->window.getSize();
 
@@ -217,9 +217,9 @@ void GameplayStateGuest::Update() {
     for (auto it = _enemyBullets.begin(); it != _enemyBullets.end();) {
         it->sprite.move(it->velocity);
         it->hitbox.setPosition(it->sprite.getPosition());
+        
         // Sprawdzenie kolizji z graczem (klientem)
         if (_player.core.hitbox.getGlobalBounds().intersects(it->hitbox.getGlobalBounds())) {
-            _player.core.health -= 10; // Przykładowe obrażenia
             if (_udpManager) _udpManager->Send("hit_player"); // Informuj hosta o trafieniu
             it = _enemyBullets.erase(it);
         } else if (it->sprite.getPosition().x < 0 || it->sprite.getPosition().x > _windowSize.x ||
@@ -285,15 +285,20 @@ void GameplayStateGuest::ReceiveNetworkData() {
                     if (parts.size() == 6) {
                         try {
                             Bullet bullet;
+                            bullet.sprite.setTexture(_data->assetManager.GetTexture( "bulletRed"));
+                            bullet.sprite.setScale(0.8f, 0.8f);
+                            bullet.sprite.setOrigin(bullet.sprite.getLocalBounds().width / 2, bullet.sprite.getLocalBounds().height / 2);
                             bullet.sprite.setPosition(std::stof(parts[0]), std::stof(parts[1]));
                             bullet.velocity = {std::stof(parts[2]), std::stof(parts[3])};
                             bullet.sprite.setRotation(std::stof(parts[4]));
                             int owner = std::stoi(parts[5]);
 
-                            // Ustaw teksturę w zależności od właściciela
-                            bullet.sprite.setTexture(_data->assetManager.GetTexture(
-                                owner == 0 ? "bulletBlue" : "bulletRed"
-                            ));
+                            bullet.hitbox.setSize(sf::Vector2f(bullet.sprite.getGlobalBounds().width * 0.8f, bullet.sprite.getGlobalBounds().height * 0.8f)); // Smaller hitbox
+                            bullet.hitbox.setOrigin(bullet.hitbox.getSize().x / 2, bullet.hitbox.getSize().y / 2);
+                            bullet.hitbox.setPosition(bullet.sprite.getPosition());
+                            bullet.hitbox.setFillColor(sf::Color::Transparent);
+                            bullet.hitbox.setOutlineColor(sf::Color::Yellow);
+                            bullet.hitbox.setOutlineThickness(1.0f);
 
                             // Dodaj tylko pociski wroga
                             if (owner == 0) {
