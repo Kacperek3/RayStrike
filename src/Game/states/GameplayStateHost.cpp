@@ -108,8 +108,8 @@ void GameplayStateHost::Init() {
     _data->assetManager.LoadTexture("egun", "assets/egun2.png");
     _data->assetManager.LoadTexture("player", "assets/player1.png");
     _data->assetManager.LoadTexture("enemy", "assets/enemy1.png");
-    _data->assetManager.LoadTexture("bulletBlue", "assets/bulletBlue.png"); // Host bullets
-    _data->assetManager.LoadTexture("bulletRed", "assets/bulletRed.png");   // Guest bullets
+    _data->assetManager.LoadTexture("bulletBlue", "assets/bulletBlue.png"); 
+    _data->assetManager.LoadTexture("bulletRed", "assets/bulletRed.png");
 
 
     if (!_font.loadFromFile("assets/fonts/Orbitron/Orbitron-VariableFont_wght.ttf")) {
@@ -176,7 +176,6 @@ void GameplayStateHost::ProcessGuestMessage(const std::string& msg) {
     // This function will be called from the network thread, so lock access to shared game state
     std::lock_guard<std::mutex> lock(_gameStateMutex);
 
-    std::cout << "Host received: " << msg << std::endl;
     size_t typeEnd = msg.find(';');
     if (typeEnd == std::string::npos) return; // Invalid message format
 
@@ -195,19 +194,54 @@ void GameplayStateHost::ProcessGuestMessage(const std::string& msg) {
                 std::cerr << "Invalid argument for pos: " << ia.what() << std::endl;
             }
         }
-    } else if (type == "fire") {
-        // Guest fired. We need guest's gun angle.
-        // For simplicity, assume guest sends its gun angle.
-        // Example: "fire;angle_degrees"
+    } else if (type == "fire") { // Oczekuje "fire;kąt"
         try {
-            float angleDegrees = std::stof(data);
-             FireBullet(_enemy, _enemy.render.gunSprite, angleDegrees, false);
+            
+            size_t semicolonPos = data.find(';');
+            std::string angleStr = data.substr(semicolonPos + 1);
+
+            size_t newlinePos = angleStr.find_first_of("\r\n");
+            if (newlinePos != std::string::npos)
+                angleStr = angleStr.substr(0, newlinePos);
+
+            float angle = std::stof(angleStr);
+            std::cout << "HOST received fire angle: " << angle << std::endl;
+
+            FireBullet(_enemy, _enemy.render.gunSprite, angle, false);
         } catch (const std::invalid_argument& ia) {
-             std::cerr << "Invalid argument for fire angle: " << ia.what() << std::endl;
+            std::cerr << "Invalid argument for fire angle: " << ia.what() << std::endl;
+        } catch (const std::out_of_range& oor) { // DODANO OBSŁUGĘ std::out_of_range
+            std::cerr << "Out of range for fire angle: " << oor.what() << std::endl;
         }
-    } else if (type == "hit_player") { // Guest reports it hit the host
+    }
+    else if (type == "hit_player") { // Guest reports it hit the host
         _player.core.health = std::max(0, _player.core.health - 10); // Example damage
-    } else if (type == "disconnect") {
+    }
+    else if(type == "gun_angle_enemy"){
+        try {
+            float angle = std::stof(data);
+            _enemy.render.gunSprite->setRotation(angle); // Update guest's gun rotation
+        } catch (const std::invalid_argument& ia) {
+            std::cerr << "Invalid argument for gun_angle_enemy: " << ia.what() << std::endl;
+        } catch (const std::out_of_range& oor) {
+            std::cerr << "Out of range for gun_angle_enemy: " << oor.what() << std::endl;
+        }
+    } 
+    else if (type == "pos_enemy") {
+        size_t sep = data.find(';');
+        if (sep != std::string::npos) {
+            try {
+                float x = std::stof(data.substr(0, sep));
+                float y = std::stof(data.substr(sep + 1));
+                _player.core.hitbox.setPosition(x, y); // Update host's position
+                _player.render.bodySprite->setPosition(x,y);
+            } catch (const std::invalid_argument& ia) {
+                std::cerr << "Invalid argument for pos_enemy: " << ia.what() << std::endl;
+            }
+        }
+
+    } 
+    else if (type == "disconnect") {
         std::cout << "Guest disconnected." << std::endl;
         // Handle guest disconnection, e.g., end game or wait for new guest
         _roundOver = true; // Or some other state
@@ -232,24 +266,49 @@ void GameplayStateHost::SendGameStateToGuest() {
     // Host Player (becomes "enemy" for the guest)
     oss << "pos_enemy;" << std::fixed << std::setprecision(2) << _player.core.hitbox.getPosition().x 
         << ";" << _player.core.hitbox.getPosition().y << "\n";
-    oss << "health_enemy;" << _player.core.health << "\n";
-    oss << "gun_angle_enemy;" << _player.render.gunSprite->getRotation() << "\n";
+    _udpManager->Send(oss.str()); // Send position immediately
+    oss.str(""); // Clear the string stream for next message
 
+
+    oss << "health_enemy;" << _player.core.health << "\n";
+    _udpManager->Send(oss.str()); // Send position immediately
+    oss.str(""); // Clear the string stream for next message
+
+    oss << "gun_angle_enemy;" << _player.render.gunSprite->getRotation() << "\n";
+    _udpManager->Send(oss.str()); // Send position immediately
+    oss.str(""); // Clear the string stream for next message
 
     // Guest Player (is "player" for the guest)
     oss << "pos_player;" << std::fixed << std::setprecision(2) << _enemy.core.hitbox.getPosition().x 
         << ";" << _enemy.core.hitbox.getPosition().y << "\n";
+    _udpManager->Send(oss.str()); // Send position immediately
+    oss.str(""); // Clear the string stream for next message
+
+
     oss << "health_player;" << _enemy.core.health << "\n";
+    _udpManager->Send(oss.str()); // Send position immediately
+    oss.str(""); // Clear the string stream for next message
+
+
     oss << "gun_angle_player;" << _enemy.render.gunSprite->getRotation() << "\n";
+    _udpManager->Send(oss.str()); // Send position immediately
+    oss.str(""); // Clear the string stream for next message
 
 
     // Bullets - send all bullets with their owner and state
     for (const auto& bullet : _bullets) {
-        oss << "bullet;" << bullet.ownerId << ";" 
-            << bullet.sprite.getPosition().x << ";" << bullet.sprite.getPosition().y << ";"
-            << bullet.velocity.x << ";" << bullet.velocity.y << ";" 
-            << bullet.sprite.getRotation() << "\n";
+        // Format: bullet;x;y;velX;velY;rotation;owner
+        oss << "bullet;" 
+            << bullet.sprite.getPosition().x << ";" 
+            << bullet.sprite.getPosition().y << ";"
+            << bullet.velocity.x << ";"
+            << bullet.velocity.y << ";"
+            << bullet.sprite.getRotation() << ";"
+            << bullet.ownerId << "\n";
+        _udpManager->Send(oss.str()); // Send position immediately
+        oss.str(""); // Clear the string stream for next message
     }
+   
     
     if (_roundOver) {
         // Determine winner (0 for host, 1 for guest, -1 for draw/error)
@@ -259,8 +318,7 @@ void GameplayStateHost::SendGameStateToGuest() {
         oss << "round_over;" << winnerId << "\n";
     }
 
-
-    _udpManager->Send(oss.str());
+    //_udpManager->Send(oss.str());
 }
 
 
@@ -400,10 +458,11 @@ void GameplayStateHost::HandleCollisions() {
 
 
 void GameplayStateHost::FireBullet(Player& shooter, sf::Sprite* gunSprite, float angleDegrees, bool isHostBullet) {
-    std::lock_guard<std::mutex> lock(_gameStateMutex); // Lock when modifying bullets vector
     Bullet newBullet;
     newBullet.sprite.setTexture(_data->assetManager.GetTexture(isHostBullet ? "bulletBlue" : "bulletRed"));
     newBullet.ownerId = isHostBullet ? 0 : 1;
+
+    std::cout << angleDegrees * 2 << std::endl; // Debug log for angle
 
     float angleRad = angleDegrees * PI / 180.f;
     float gunLength = gunSprite->getGlobalBounds().width * gunSprite->getScale().x; // Consider scale
@@ -414,7 +473,6 @@ void GameplayStateHost::FireBullet(Player& shooter, sf::Sprite* gunSprite, float
     newBullet.sprite.setPosition(gunPivot + gunTipOffset);
     newBullet.sprite.setRotation(angleDegrees);
     newBullet.sprite.setOrigin(newBullet.sprite.getLocalBounds().width / 2, newBullet.sprite.getLocalBounds().height / 2);
-
 
     newBullet.hitbox.setSize(sf::Vector2f(newBullet.sprite.getGlobalBounds().width * 0.8f, newBullet.sprite.getGlobalBounds().height * 0.8f)); // Smaller hitbox
     newBullet.hitbox.setOrigin(newBullet.hitbox.getSize().x / 2, newBullet.hitbox.getSize().y / 2);
@@ -453,6 +511,12 @@ void GameplayStateHost::DisplayPlayerData(Player &p) {
     p.render.healthBarFill.setPosition(p.render.healthBarBackground.getPosition().x + 2.f, p.render.healthBarBackground.getPosition().y + 1.f); // Relative to background
     float healthPercentage = static_cast<float>(p.core.health) / 100.f;
     p.render.healthBarFill.setSize(sf::Vector2f(56.f * healthPercentage, 6.f));
+
+    if (&p == &_player) { // Compare addresses to identify the local player
+        p.render.healthBarFill.setFillColor(sf::Color::Green);
+    } else {
+        p.render.healthBarFill.setFillColor(sf::Color::Red);
+    }
 }
 
 bool GameplayStateHost::CheckWin() {

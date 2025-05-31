@@ -5,6 +5,7 @@
 #include <string>   // Required for std::string, std::stof, std::stoi
 #include <stdexcept> // Required for std::invalid_argument, std::out_of_range
 #include <chrono> // Required for std::chrono::milliseconds
+#include <sstream> // Required for std::istringstream
 
 #define PI 3.14159f
 
@@ -83,6 +84,7 @@ void GameplayStateGuest::Init() {
     _data->assetManager.LoadTexture("player", "assets/player1.png");
     _data->assetManager.LoadTexture("enemy", "assets/enemy1.png");
     _data->assetManager.LoadTexture("bulletBlue", "assets/bulletBlue.png");
+    _data->assetManager.LoadTexture("bulletRed", "assets/bulletRed.png"); // Guest bullets
 
     if (!_font.loadFromFile("assets/fonts/Orbitron/Orbitron-VariableFont_wght.ttf")) {
         std::cout << "Failed to load font" << std::endl;
@@ -131,7 +133,7 @@ void GameplayStateGuest::HandleInput() {
         if (event.type == sf::Event::Closed) {
             _running = false; // Signal network thread to stop
             _data->window.close();
-            if (_udpManager) _udpManager->Send("disconnect"); // Informuj hosta o rozłączeniu
+            if (_udpManager) _udpManager->Send("disconnect \n"); // Informuj hosta o rozłączeniu
         }
 
         if (event.type == sf::Event::KeyPressed) {
@@ -151,10 +153,11 @@ void GameplayStateGuest::HandleInput() {
             FireBullet(_player.render.bodySprite, _player.render.gunSprite);
             // Wysłanie informacji o wystrzale do hosta
             if (_udpManager) {
-                // Serializacja danych pocisku (pozycja, prędkość)
-                // Przykład: "fire;x;y;velX;velY"
-                // Tutaj uproszczone, wyślij tylko fakt wystrzału
-                _udpManager->Send("fire"); 
+                float angle = _player.render.gunSprite->getRotation();
+                std::string angleStr = std::to_string(angle);
+                std::string msg = "fire;" + angleStr + "\n"; // Informacja o kącie wystrzału
+                std::cout << "Guest Sending Fire Message: " << msg << std::endl; // LOG RAW MESSAGE
+                _udpManager->Send(msg);
             }
         }
     }
@@ -164,7 +167,7 @@ void GameplayStateGuest::HandleInput() {
     if (CheckWin()) {
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::R)) {
             RoundInit();
-            if (_udpManager) _udpManager->Send("restart_request");
+            if (_udpManager) _udpManager->Send("restart_request \n");
         }
         return;
     }
@@ -176,8 +179,13 @@ void GameplayStateGuest::HandleInput() {
 
     // Wysłanie pozycji gracza do hosta
     if (_udpManager && (_player.core.velocity.x != 0 || _player.core.velocity.y != 0)) {
-        std::string posMsg = "pos;" + std::to_string(_player.core.hitbox.getPosition().x) + ";" + std::to_string(_player.core.hitbox.getPosition().y);
+        std::string posMsg = "pos;" + std::to_string(_player.core.hitbox.getPosition().x) + ";" + std::to_string(_player.core.hitbox.getPosition().y) + "\n";
         _udpManager->Send(posMsg);
+    }
+    if(_udpManager && _player.render.gunSprite) {
+        float angle = _player.render.gunSprite->getRotation();
+        std::string angleMsg = "gun_angle_enemy;" + std::to_string(angle) + "\n";
+        _udpManager->Send(angleMsg); // Informuj hosta o kącie broni
     }
 }
 
@@ -204,16 +212,7 @@ void GameplayStateGuest::Update() {
         }
     }
 
-    // Logika odbierania wiadomości została przeniesiona do ReceiveNetworkData()
-    // W metodzie Update() możemy przetwarzać dane przygotowane przez wątek sieciowy,
-    // np. aktualizować pozycję przeciwnika na podstawie danych chronionych mutexem.
-    // Poniższy blok jest przykładem, jak można by to zrobić, ale konkretna implementacja
-    // zależy od tego, jak dane są przekazywane z wątku sieciowego.
-    // W tym przykładzie zakładamy, że UpdateEnemyPosition i inne funkcje modyfikujące stan
-    // są wywoływane bezpośrednio z wątku sieciowego (z odpowiednią synchronizacją).
 
-    // Aktualizacja pocisków przeciwnika (otrzymanych z sieci)
-    // Dostęp do _enemyBullets powinien być chroniony mutexem, jeśli jest modyfikowany przez wątek sieciowy
     std::lock_guard<std::mutex> lock(_dataMutex);
     for (auto it = _enemyBullets.begin(); it != _enemyBullets.end();) {
         it->sprite.move(it->velocity);
@@ -245,8 +244,7 @@ void GameplayStateGuest::ReceiveNetworkData() {
             if (typeEnd != std::string::npos) {
                 std::string type = msg.substr(0, typeEnd);
                 std::string data = msg.substr(typeEnd + 1);
-                //std::cout << "Guest Parsed Type (Thread): [" << type << "], Data: [" << data << "]" << std::endl;
-
+                std::cout << "Guest Received Type (Thread): " << type << std::endl;
                 std::lock_guard<std::mutex> lock(_dataMutex); // Lock before accessing shared data
                 if (type == "pos_enemy") {
                     size_t sep = data.find(';');
@@ -274,7 +272,40 @@ void GameplayStateGuest::ReceiveNetworkData() {
                     } catch (const std::out_of_range& oor) {
                         std::cerr << "Guest ERR (Thread): Out of range for std::stof in gun_angle_enemy: " << oor.what() << " | Data: " << data << std::endl;
                     }
-                } else if (type == "fire_enemy") {
+                } 
+                else if (type == "bullet") {
+                    std::vector<std::string> parts;
+                    size_t pos = 0;
+                    while ((pos = data.find(';')) != std::string::npos) {
+                        parts.push_back(data.substr(0, pos));
+                        data.erase(0, pos + 1);
+                    }
+                    parts.push_back(data);
+                    std::cout << "Guest Received bullet (Thread). Parts size: " << parts.size() << std::endl;
+                    if (parts.size() == 6) {
+                        try {
+                            Bullet bullet;
+                            bullet.sprite.setPosition(std::stof(parts[0]), std::stof(parts[1]));
+                            bullet.velocity = {std::stof(parts[2]), std::stof(parts[3])};
+                            bullet.sprite.setRotation(std::stof(parts[4]));
+                            int owner = std::stoi(parts[5]);
+
+                            // Ustaw teksturę w zależności od właściciela
+                            bullet.sprite.setTexture(_data->assetManager.GetTexture(
+                                owner == 0 ? "bulletBlue" : "bulletRed"
+                            ));
+
+                            // Dodaj tylko pociski wroga
+                            if (owner == 0) {
+                                _enemyBullets.push_back(bullet);
+                            }
+                        } catch (...) {
+                            // Obsługa błędów
+                        }
+                    }
+                }
+                
+                else if (type == "fire_enemy") {
                     //std::cout << "Guest Received fire_enemy (Thread). Data: " << data << std::endl;
                     // TODO: Implement full deserialization for enemy bullets, ensuring thread safety
                     // For example, add to a temporary queue and process in Update() or directly add to _enemyBullets with mutex.
@@ -289,6 +320,7 @@ void GameplayStateGuest::ReceiveNetworkData() {
                     }
                 } else if (type == "health_player") {
                     try {
+                        std::cout <<std::stoi(data) << std::endl;
                         _player.core.health = std::stoi(data); // Modifies shared data
                         //std::cout << "Guest Applied health_player (Thread): " << _player.core.health << std::endl;
                     } catch (const std::invalid_argument& ia) {
@@ -333,15 +365,6 @@ void GameplayStateGuest::UpdateGunTransform(sf::Sprite *targetSprite, sf::Sprite
     }
 }
 
-// void GameplayStateGuest::UpdateEnemyBullets(const std::vector<Bullet>& newBullets) {
-//     // Aktualizacja stanu pocisków przeciwnika
-//     _enemy.bullets = newBullets;
-//
-//     // Synchronizacja pozycji i rotacji
-//     for(auto& bullet : _enemy.bullets) {
-//         bullet.sprite.setRotation(atan2(bullet.velocity.y, bullet.velocity.x) * 180 / 3.14159f);
-//     }
-// }
 
 void GameplayStateGuest::UpdateGunRotation(sf::Sprite* targetSprite, sf::Sprite* gunSprite) {
     sf::Vector2f direction = _mousePosition - targetSprite->getPosition();
@@ -357,8 +380,17 @@ void GameplayStateGuest::DisplayPlayerData(Player &p) {
     float textX = position.x - (textBounds.width / 2);  // wyśrodkuj horyzontalnie
     float textY = position.y - (bounds.height / 2) - 34;
 
-    p.render.healthBarBackground.setPosition(position.x - 30.f, position.y - bounds.height/2 - 10.f);
-    p.render.healthBarFill.setPosition(position.x - 28.f, position.y - bounds.height/2 - 12.f);
+    p.render.healthBarBackground.setPosition(position.x - 30.f, position.y - (bounds.height / 2) - 20.f); // Slightly adjust Y
+    p.render.healthBarFill.setPosition(p.render.healthBarBackground.getPosition().x + 2.f, p.render.healthBarBackground.getPosition().y + 1.f); // Relative to background
+    float healthPercentage = static_cast<float>(p.core.health) / 100.f;
+    p.render.healthBarFill.setSize(sf::Vector2f(56.f * healthPercentage, 6.f));
+
+
+    if (&p == &_player) { // Compare addresses to identify the local player
+        p.render.healthBarFill.setFillColor(sf::Color::Green);
+    } else {
+        p.render.healthBarFill.setFillColor(sf::Color::Red);
+    }
 
     p.render.indicatorText->setPosition(textX, textY);
 }
@@ -457,6 +489,12 @@ void GameplayStateGuest::Draw() {
     }
 
     for (const auto& bullet : _bullets) {
+        _data->window.draw(bullet.sprite);
+        if (_hitboxVisibility) {
+            _data->window.draw(bullet.hitbox);
+        }
+    }
+    for (const auto& bullet : _enemyBullets) {
         _data->window.draw(bullet.sprite);
         if (_hitboxVisibility) {
             _data->window.draw(bullet.hitbox);

@@ -105,7 +105,7 @@ bool UdpNetworkManager::SetupUdpConnection() {
         std::cout << "Host: Sending own UDP port " << myPort << " to client via TCP socket " << _tcpSocket << std::endl;
         
         //wait for the client to be ready
-        std::this_thread::sleep_for(std::chrono::milliseconds(700)); // Optional: wait for client to be ready
+        std::this_thread::sleep_for(std::chrono::milliseconds(1200)); // Optional: wait for client to be ready
         
         bytes_processed = send(_tcpSocket, &myPort, sizeof(myPort), 0);
         if (bytes_processed != sizeof(myPort)) {
@@ -152,20 +152,7 @@ bool UdpNetworkManager::SetupUdpConnection() {
         }
         std::cout << "Client: Received server UDP port: " << serverPort << std::endl;
 
-        // 2. Client sends ACK to Host (confirming Client received Host's port) - REMOVED
-        // std::cout << "Client: Sending ACK to host for host UDP port..." << std::endl;
         
-        // //wait for the host to be ready
-        // std::this_thread::sleep_for(std::chrono::milliseconds(1100)); // Optional: wait for host to be ready
-
-        // bytes_processed = send(_tcpSocket, &ack_char, sizeof(ack_char), 0);
-        // if (bytes_processed != sizeof(ack_char)) {
-        //     std::cerr << "Client: Failed to send ACK for host UDP port. Sent " << bytes_processed << ". errno: " << strerror(errno) << std::endl;
-        //     return false;
-        // }
-        // std::cout << "Client: Successfully sent ACK for host UDP port." << std::endl;
-
-        // Create and bind client's UDP socket
         _udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
         if (_udpSocket == -1) {
             std::cerr << "Client: Failed to create UDP socket. errno: " << strerror(errno) << std::endl;
@@ -192,7 +179,7 @@ bool UdpNetworkManager::SetupUdpConnection() {
 
         // 3. Client sends its UDP port to Host
         std::cout << "Client: Sending own UDP port " << myPort << " to server via TCP socket " << _tcpSocket << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(4000)); // Optional: wait for host to be ready
+        std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // Optional: wait for host to be ready
         //wait for the host to be ready
 
 
