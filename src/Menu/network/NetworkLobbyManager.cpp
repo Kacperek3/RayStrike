@@ -31,11 +31,15 @@ void NetworkLobbyManager::ReceiveThreadFunc() {
         FD_ZERO(&readSet);
         FD_SET(activeSocket, &readSet);
 
-        timeval timeout{0, 100000};
+        timeval timeout{0, 100000}; // 100ms
 
         int result = select(activeSocket + 1, &readSet, nullptr, nullptr, &timeout);
-        
+       
+        if (!_running) break; 
+
         if (result > 0) {
+            if (!_running) break;
+
             char buffer[1024];
             ssize_t received = recv(activeSocket, buffer, sizeof(buffer) - 1, 0);
 
@@ -68,7 +72,6 @@ void NetworkLobbyManager::ReceiveThreadFunc() {
             }
         }
         else if (result == -1) {
-            // Błąd select
             break;
         }
     }
@@ -81,10 +84,29 @@ NetworkLobbyManager::~NetworkLobbyManager() {
     }
     
     if (_isServer) {
-        close(_socketServerForClient);
+        if (_socketServerForClient != -1) {
+            close(_socketServerForClient);
+            std::cout << "NetworkLobbyManager: Closed server socket." << std::endl;
+        }
     } else {
-        close(_socketClient);
+        if (_socketClient != -1) {
+            close(_socketClient);
+            std::cout << "NetworkLobbyManager: Closed client socket." << std::endl;
+        }
+    } 
+}
+
+void NetworkLobbyManager::ReleaseSocket() {
+    _running = false;
+    
+    if (_receiveThread.joinable()) {
+        _receiveThread.join();
     }
+
+    _socketServerForClient = -1;
+    _socketClient = -1;
+    
+    _connected = false;
 }
 
 bool NetworkLobbyManager::Send(const std::string& message) {

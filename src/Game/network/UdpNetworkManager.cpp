@@ -3,7 +3,8 @@
 #include <cstring> // For strerror (already in .h but good practice for .cpp if used directly)
 #include <iostream> // For std::cerr (already in .h)
 
-const char PORT_DATA_ACK = 'K'; // Define the ACK character
+const int SYNC_MAGIC_REQ = 0x11223344;
+const int SYNC_MAGIC_ACK = 0x55667788;
 
 UdpNetworkManager::UdpNetworkManager(int tcpSocketServer, int tcpSocketClient) {
     if (tcpSocketServer != -1) {
@@ -40,27 +41,30 @@ bool UdpNetworkManager::Initialize() {
     return true;
 }
 
-ssize_t UdpNetworkManager::recv_all(int sockfd, void *buf, size_t len, int flags) {
+ssize_t UdpNetworkManager::recv_all(int sockfd, void *buf, size_t len, int flags, int timeoutMs) {
     size_t total_received = 0;
     char *p = static_cast<char*>(buf);
+    auto startTime = std::chrono::steady_clock::now();
 
     while (total_received < len) {
+        auto now = std::chrono::steady_clock::now();
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime).count() > timeoutMs) {
+            std::cerr << "recv_all: Timeout waiting for data." << std::endl;
+            return -1;
+        }
+
         ssize_t received_now = recv(sockfd, p + total_received, len - total_received, flags);
 
         if (received_now == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                // Gniazdo nieblokujące, brak danych w tej chwili
-                // std::cout << "recv_all: Resource temporarily unavailable. Retrying..." << std::endl;
-                std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Krótkie opóźnienie przed ponowieniem
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
                 continue;
             }
-            // Inny błąd
-            std::cerr << "recv_all failed with error: " << strerror(errno) << std::endl;
+            std::cerr << "recv_all failed: " << strerror(errno) << std::endl;
             return -1;
         } else if (received_now == 0) {
-            // Połączenie zamknięte przez drugą stronę
             std::cerr << "recv_all: Connection closed by peer." << std::endl;
-            return 0; // lub -1 jeśli traktujemy to jako błąd w tym kontekście
+            return 0;
         }
         total_received += received_now;
     }
@@ -68,173 +72,134 @@ ssize_t UdpNetworkManager::recv_all(int sockfd, void *buf, size_t len, int flags
 }
 
 
+bool UdpNetworkManager::SyncTcpHandshake() {
+    int timeout = 5000; 
+    auto start = std::chrono::steady_clock::now();
+
+    int targetMagic = _isServer ? SYNC_MAGIC_REQ : SYNC_MAGIC_ACK;
+    const char* targetPtr = reinterpret_cast<const char*>(&targetMagic);
+    std::string role = _isServer ? "Host" : "Client";
+
+    if (!_isServer) {
+        std::cout << "Client: Sending handshake request..." << std::endl;
+        int req = SYNC_MAGIC_REQ;
+        if (send(_tcpSocket, &req, sizeof(req), 0) != sizeof(req)) return false;
+        std::cout << "Client: Waiting for Host ACK (Sliding Window Scan)..." << std::endl;
+    } else {
+        std::cout << "Host: Waiting for Client handshake (Sliding Window Scan)..." << std::endl;
+    }
+
+    std::vector<char> history;
+    bool synced = false;
+
+    while (!synced) {
+        char byte = 0;
+        ssize_t res = recv(_tcpSocket, &byte, 1, MSG_DONTWAIT);
+        
+        if (res == 1) {
+            history.push_back(byte);
+            if (history.size() > sizeof(int)) {
+                history.erase(history.begin());
+            }
+
+            if (history.size() == sizeof(int)) {
+                if (memcmp(history.data(), targetPtr, sizeof(int)) == 0) {
+                    std::cout << role << ": Handshake FOUND despite garbage!" << std::endl;
+                    synced = true;
+                }
+            }
+        } else if (res == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        } else if (res == 0) {
+            std::cerr << role << ": Connection closed during handshake." << std::endl;
+            return false;
+        }
+
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count() > timeout) {
+            std::cerr << role << ": Handshake timeout!" << std::endl;
+            return false;
+        }
+    }
+
+    if (_isServer) {
+        int ack = SYNC_MAGIC_ACK;
+        if (send(_tcpSocket, &ack, sizeof(ack), 0) != sizeof(ack)) {
+            std::cerr << "Host: Failed to send ACK." << std::endl;
+            return false;
+        }
+        std::cout << "Host: Sent ACK." << std::endl;
+    } else {
+        std::cout << "Client: Handshake successful!" << std::endl;
+    }
+    
+    return true;
+}
+
 bool UdpNetworkManager::SetupUdpConnection() {
     std::cout << (_isServer ? "Host" : "Client") << " UdpNetworkManager: Setting up UDP connection..." << std::endl;
-    ssize_t bytes_processed;
 
-    // Server side
+    // KROK 0: SYNCHRONIZACJA (To naprawia problem "kto wszedł pierwszy")
+    // Host już nie śpi 1500ms, tylko czeka aktywnie na sygnał od klienta.
+    if (!SyncTcpHandshake()) {
+        std::cerr << "TCP Sync failed. Aborting UDP setup." << std::endl;
+        return false;
+    }
+
+    // --- Reszta kodu jest podobna, ale bezpieczniejsza dzięki recv_all z timeoutem ---
+
+    _udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (_udpSocket == -1) return false;
+
+    // Bind do losowego portu
+    sockaddr_in myAddr{};
+    myAddr.sin_family = AF_INET;
+    myAddr.sin_addr.s_addr = INADDR_ANY;
+    myAddr.sin_port = 0; 
+    if (bind(_udpSocket, (sockaddr*)&myAddr, sizeof(myAddr)) == -1) {
+        close(_udpSocket); return false;
+    }
+
+    socklen_t len = sizeof(myAddr);
+    getsockname(_udpSocket, (sockaddr*)&myAddr, &len);
+    int myPort = ntohs(myAddr.sin_port);
+    std::cout << "My UDP Port: " << myPort << std::endl;
+
+    int remotePort = 0;
+    ssize_t bytes;
+
+
     if (_isServer) {
-        _udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
-        if (_udpSocket == -1) {
-            std::cerr << "Host: Failed to create UDP socket. errno: " << strerror(errno) << std::endl;
-            return false;
-        }
-
-        sockaddr_in serverAddr{};
-        serverAddr.sin_family = AF_INET;
-        serverAddr.sin_addr.s_addr = INADDR_ANY;
-        serverAddr.sin_port = 0; // Bind to a random available port
-
-        if (bind(_udpSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
-            std::cerr << "Host: Failed to bind UDP socket. errno: " << strerror(errno) << std::endl;
-            close(_udpSocket);
-            return false;
-        }
-
-        socklen_t len = sizeof(serverAddr);
-        if (getsockname(_udpSocket, (sockaddr*)&serverAddr, &len) == -1) {
-            std::cerr << "Host: Failed to get socket name for UDP port. errno: " << strerror(errno) << std::endl;
-            close(_udpSocket);
-            return false;
-        }
-        int myPort = ntohs(serverAddr.sin_port);
-        std::cout << "Host: UDP socket bound to port: " << myPort << std::endl;
-
-        // 1. Host sends its UDP port to Client
+        if (send(_tcpSocket, &myPort, sizeof(myPort), 0) != sizeof(myPort)) return false;
         
-        std::cout << "Host: Sending own UDP port " << myPort << " to client via TCP socket " << _tcpSocket << std::endl;
+        if (recv_all(_tcpSocket, &remotePort, sizeof(remotePort), 0) <= 0) return false;
         
-        for(int i = 0; i < 5; ++i) {
-            std::cout << "Host: Attempting to send own UDP port to client, attempt " << (i + 1) << std::endl;
-            std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Wait a bit before retrying
-            bytes_processed = send(_tcpSocket, &myPort, sizeof(myPort), 0);
-        }
-        
-        
-        if (bytes_processed != sizeof(myPort)) {
-            std::cerr << "Host: Failed to send UDP port to client. Sent " << bytes_processed << ". errno: " << strerror(errno) << std::endl;
-            close(_udpSocket);
-            return false;
-        }
-        std::cout << "Host: Successfully sent own UDP port to client." << std::endl; // Added log
+        const char* start_msg = "START";
+        if (send(_tcpSocket, start_msg, 5, 0) != 5) return false;
 
-        int clientPort = 0;
-        std::cout << "Host: Waiting to receive client UDP port via TCP socket " << _tcpSocket << std::endl;
-        bytes_processed = recv_all(_tcpSocket, &clientPort, sizeof(clientPort), 0);
-         if (bytes_processed <= 0) { // recv_all zwróci -1 lub 0 przy błędzie/zamknięciu
-            std::cerr << "Host: Failed to receive client UDP port. recv_all returned " << bytes_processed << std::endl;
-            close(_udpSocket);
-            return false;
-        }
-        std::cout << "Host: Received client UDP port: " << clientPort << std::endl;
-
-        sockaddr_in tcpClientAddr{};
-        socklen_t tcpLen = sizeof(tcpClientAddr);
-        if (getpeername(_tcpSocket, (sockaddr*)&tcpClientAddr, &tcpLen) == -1) {
-            std::cerr << "Host: Failed to get client IP address from TCP socket. errno: " << strerror(errno) << std::endl;
-            close(_udpSocket);
-            return false;
-        }
-        char clientIpStr[INET_ADDRSTRLEN];
-        inet_ntop(AF_INET, &tcpClientAddr.sin_addr, clientIpStr, INET_ADDRSTRLEN);
+    } else {
+        if (recv_all(_tcpSocket, &remotePort, sizeof(remotePort), 0) <= 0) return false;
         
-        _remoteAddr = tcpClientAddr;
-        _remoteAddr.sin_port = htons(clientPort);
-        std::cout << "Host: Remote UDP address set to IP: " << clientIpStr << ", Port: " << clientPort << std::endl;
+        if (send(_tcpSocket, &myPort, sizeof(myPort), 0) != sizeof(myPort)) return false;
 
+        char buffer[6] = {0};
+        if (recv_all(_tcpSocket, buffer, 5, 0) <= 0) return false;
+        if (strncmp(buffer, "START", 5) != 0) {
+             std::cerr << "Client: START confirmation invalid." << std::endl;
+             return false;
+        }
     }
-    // Client side
-    else {
-        // 1. Client waits to receive Host's UDP port
-        int serverPort;
-        std::cout << "Client: Waiting to receive server UDP port via TCP socket " << _tcpSocket << std::endl;
-        bytes_processed = recv_all(_tcpSocket, &serverPort, sizeof(serverPort), 0);
-        if (bytes_processed <= 0) {
-            std::cerr << "Client: Failed to receive server UDP port. recv_all returned " << bytes_processed << std::endl;
-            return false;
-        }
-        std::cout << "Client: Received server UDP port: " << serverPort << std::endl;
 
-        
-        _udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
-        if (_udpSocket == -1) {
-            std::cerr << "Client: Failed to create UDP socket. errno: " << strerror(errno) << std::endl;
-            return false;
-        }
-        sockaddr_in clientAddr{};
-        clientAddr.sin_family = AF_INET;
-        clientAddr.sin_addr.s_addr = INADDR_ANY;
-        clientAddr.sin_port = 0;
-        if (bind(_udpSocket, (sockaddr*)&clientAddr, sizeof(clientAddr)) == -1) {
-            std::cerr << "Client: Failed to bind UDP socket. errno: " << strerror(errno) << std::endl;
-            close(_udpSocket);
-            return false;
-        }
-        socklen_t len = sizeof(clientAddr);
-        if (getsockname(_udpSocket, (sockaddr*)&clientAddr, &len) == -1) {
-            std::cerr << "Client: Failed to get socket name for UDP port. errno: " << strerror(errno) << std::endl;
-            close(_udpSocket);
-            return false;
-        }
-        int myPort = ntohs(clientAddr.sin_port);
-        std::cout << "Client: UDP socket bound to port: " << myPort << std::endl;
+    std::cout << "Remote UDP Port received: " << remotePort << std::endl;
 
-
-        // 3. Client sends its UDP port to Host
-        std::cout << "Client: Sending own UDP port " << myPort << " to server via TCP socket " << _tcpSocket << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // Optional: wait for host to be ready
-        //wait for the host to be ready
-
-
-        for(int i = 0; i < 10; ++i) {
-            std::cout << "Client: Attempting to send own UDP port to server, attempt " << (i + 1) << std::endl;
-            bytes_processed = send(_tcpSocket, &myPort, sizeof(myPort), 0);
-            std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Wait a bit before retrying
-        }
-        std::cout << "send penis" << std::endl;
-
-        if (bytes_processed != sizeof(myPort)) {
-            std::cerr << "Client: Failed to send UDP port to server. Sent " << bytes_processed << ". errno: " << strerror(errno) << std::endl;
-            close(_udpSocket);
-            return false;
-        }
-        std::cout << "send penis 2" << std::endl;
-
-        std::cout << "Client: Successfully sent own UDP port to server." << std::endl; // Added log
-
-        // 4. Client waits for ACK from Host (confirming Host received Client's port) - REMOVED
-        // std::cout << "Client: Waiting for ACK from host for client UDP port..." << std::endl;
-        // bytes_processed = recv_all(_tcpSocket, &received_ack_char, sizeof(received_ack_char), 0);
-        // if (bytes_processed <= 0 || received_ack_char != ack_char) {
-        //     std::cerr << "Client: Failed to receive valid ACK for client UDP port. Bytes: " << bytes_processed << " Char: " << (int)received_ack_char << std::endl;
-        //     close(_udpSocket);
-        //     return false;
-        // }
-        // std::cout << "Client: Received ACK from host for client UDP port." << std::endl;
-
-        // Configure remote address for UDP
-        sockaddr_in tcpServerAddr{};
-        socklen_t tcpLen = sizeof(tcpServerAddr);
-        if (getpeername(_tcpSocket, (sockaddr*)&tcpServerAddr, &tcpLen) == -1) {
-            std::cerr << "Client: Failed to get server IP address from TCP socket. errno: " << strerror(errno) << std::endl;
-            close(_udpSocket);
-            return false;
-        }
-        char serverIpStr[INET_ADDRSTRLEN];
-        inet_ntop(AF_INET, &tcpServerAddr.sin_addr, serverIpStr, INET_ADDRSTRLEN);
-        
-        _remoteAddr = tcpServerAddr;
-        _remoteAddr.sin_port = htons(serverPort);
-        std::cout << "Client: Remote UDP address set to IP: " << serverIpStr << ", Port: " << serverPort << std::endl;
-    }
+    sockaddr_in peerAddr{};
+    socklen_t peerLen = sizeof(peerAddr);
+    getpeername(_tcpSocket, (sockaddr*)&peerAddr, &peerLen);
+    
+    _remoteAddr = peerAddr;
+    _remoteAddr.sin_port = htons(remotePort);
 
     _connected = true;
-    std::cout << (_isServer ? "Host" : "Client") << " UdpNetworkManager: UDP connection handshake complete. Connected flag set to true." << std::endl;
-    // Gniazdo TCP (_tcpSocket) może zostać zamknięte tutaj, jeśli nie będzie już potrzebne.
-    // Jednakże, jeśli planujesz używać go do dalszej sygnalizacji (np. rozłączanie), zostaw je otwarte.
-    // Dla tego przykładu zakładam, że nie jest już potrzebne do komunikacji UDP.
-    // close(_tcpSocket); // Rozważ zamknięcie TCP po konfiguracji
-    // _tcpSocket = -1;
+    std::cout << "UDP Connection Established!" << std::endl;
     return true;
 }
 
@@ -257,7 +222,7 @@ void UdpNetworkManager::ReceiveThreadFunc() {
                                   (sockaddr*)&fromAddr, &fromLen);
 
         if (received > 0) {
-            buffer[received] = '\\0'; // Null-terminate the received data
+            buffer[received] = '\0'; // Null-terminate the received data
 
             // Basic validation: check if message is from the expected peer
             // This is a simplified check; in a real-world scenario, you might want to be more robust,

@@ -23,7 +23,7 @@ public:
     bool WaitForMessage(std::string& outMessage, int timeoutMs);
 
     bool IsConnected() const { return _connected; }
-    
+    void ReleaseSocket(); 
     bool _isServer = false;
 
 private:
