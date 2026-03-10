@@ -1,15 +1,16 @@
 #pragma once
+#include "../network/UdpNetworkManager.h"
 #include "Game.h"
 #include "State.h"
-#include <vector>
-#include "../network/UdpNetworkManager.h"
-#include <thread> // Added for std::thread
-#include <mutex>  // Added for std::mutex
 #include <atomic> // Added for std::atomic
+#include <mutex>  // Added for std::mutex
+#include <thread> // Added for std::thread
+#include <vector>
 
 class GameplayStateGuest : public State {
-public:
-    GameplayStateGuest(GameDataRef data, int tcpSocketClient = -1);
+  public:
+    GameplayStateGuest(GameDataRef data, int tcpSocketClient, std::string hostName,
+                       std::string guestName);
     ~GameplayStateGuest();
     void Init() override;
     void HandleInput() override;
@@ -17,7 +18,9 @@ public:
     void Draw() override;
     void ClearObjects() override;
 
-private:
+  private:
+    std::string _hostName;
+    std::string _guestName;
     struct Bullet {
         sf::Sprite sprite;
         sf::Vector2f velocity;
@@ -54,13 +57,12 @@ private:
     sf::Vector2u _windowSize;
 
     Crosshair _crosshair;
-    UdpNetworkManager* _udpManager;
+    UdpNetworkManager *_udpManager;
 
     // Network thread members
     std::thread _networkThread;
     std::mutex _dataMutex;
     std::atomic<bool> _running;
-
 
     sf::Text *_roundOverText;
     sf::Text *_restartText;
@@ -71,8 +73,16 @@ private:
     bool _hitboxVisibility = false;
     int _tcpSocketClient;
 
+    std::vector<sf::RectangleShape> _walls;
+
+    int _hostScore = 0;
+    int _guestScore = 0;
+    sf::Text _scoreText;
+
     void UpdateEnemyPosition(sf::Vector2f newPosition);
-    void UpdateEnemyBullets(const std::vector<Bullet>& newBullets); // This might need adjustment or removal if bullets are handled differently with threading
+    void UpdateEnemyBullets(
+        const std::vector<Bullet> &newBullets); // This might need adjustment or removal if bullets
+                                                // are handled differently with threading
 
     // Network thread function
     void ReceiveNetworkData();
@@ -80,9 +90,9 @@ private:
     void RoundInit();
     void UpdateGunTransform(sf::Sprite *targetSprite, sf::Sprite *gunSprite);
 
-    void FireBullet(sf::Sprite* sourceSprite, sf::Sprite* gunSprite);
+    void FireBullet(sf::Sprite *sourceSprite, sf::Sprite *gunSprite);
 
-    void UpdateGunRotation(sf::Sprite* targetSprite, sf::Sprite* gunSprite);
+    void UpdateGunRotation(sf::Sprite *targetSprite, sf::Sprite *gunSprite);
     void DisplayPlayerData(Player &p);
     void DrawCustomCrosshair();
 

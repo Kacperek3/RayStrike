@@ -2,15 +2,16 @@
 #pragma once
 #include "Game.h"
 #include "State.h"
-#include <vector>
-#include <thread> // Added for std::thread
+#include "UdpNetworkManager.h"
 #include <atomic> // Added for std::atomic
 #include <mutex>  // Added for std::mutex
-#include "UdpNetworkManager.h"
+#include <thread> // Added for std::thread
+#include <vector>
 
 class GameplayStateHost : public State {
-public:
-    GameplayStateHost(GameDataRef data, int tcpSocketServer);
+  public:
+    GameplayStateHost(GameDataRef data, int tcpSocketServer, std::string hostName,
+                      std::string guestName);
     ~GameplayStateHost();
     void Init() override;
     void HandleInput() override;
@@ -18,7 +19,9 @@ public:
     void Draw() override;
     void ClearObjects() override;
 
-private:
+  private:
+    std::string _hostName;
+    std::string _guestName;
     // Re-using the same structures as in GameplayStateGuest
     struct Bullet {
         sf::Sprite sprite;
@@ -52,18 +55,23 @@ private:
     GameDataRef _data;
     Player _player; // Host's player
     Player _enemy;  // Guest's player (controlled remotely)
-    
-    std::vector<Bullet> _bullets;       // Bullets fired by the host OR guest, ownerId will differentiate
+
+    std::vector<Bullet> _bullets; // Bullets fired by the host OR guest, ownerId will differentiate
 
     sf::Vector2u _windowSize;
     Crosshair _crosshair;
-    UdpNetworkManager* _udpManager; // UDP Network Manager for host
+    UdpNetworkManager *_udpManager; // UDP Network Manager for host
 
     sf::Text *_roundOverText;
     sf::Text *_restartText;
     bool _roundOver = false;
     bool _guestRestartRequested = false;
 
+    std::vector<sf::RectangleShape> _walls;
+
+    int _hostScore = 0;
+    int _guestScore = 0;
+    sf::Text _scoreText;
 
     int _tcpSocketServer; // TCP socket for server communication
 
@@ -78,17 +86,19 @@ private:
     std::mutex _gameStateMutex; // Mutex to protect shared game state data
 
     // Initialization and Update helpers
-    void InitPlayer(Player &p, float x, float y, bool isHost, const std::string& name, const std::string& playerTexture, const std::string& gunTexture);
+    void InitPlayer(Player &p, float x, float y, bool isHost, const std::string &name,
+                    const std::string &playerTexture, const std::string &gunTexture);
     void RoundInit();
     void UpdateGunTransform(sf::Sprite *targetSprite, sf::Sprite *gunSprite);
-    void UpdateGunRotation(sf::Sprite* targetSprite, sf::Sprite* gunSprite, const sf::Vector2f& mousePos);
+    void UpdateGunRotation(sf::Sprite *targetSprite, sf::Sprite *gunSprite,
+                           const sf::Vector2f &mousePos);
     void DisplayPlayerData(Player &p);
     void DrawCustomCrosshair();
 
-    void FireBullet(Player& shooter, sf::Sprite* gunSprite, float angleDegrees, bool isHostBullet);
-    
+    void FireBullet(Player &shooter, sf::Sprite *gunSprite, float angleDegrees, bool isHostBullet);
+
     // Network message handling
-    void ProcessGuestMessage(const std::string& msg);
+    void ProcessGuestMessage(const std::string &msg);
     void SendGameStateToGuest(); // Sends relevant parts of the game state
 
     bool CheckWin(); // Returns true if a player's health is 0
