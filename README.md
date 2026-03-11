@@ -1,9 +1,10 @@
 <h1 align="center">RayStrike: C++ Multiplayer Shooter</h1>
 
 <p align="center">
-  Multiplayer top-down shooter built entirely from scratch in <strong>C++17</strong> and <strong>SFML</strong>.
+  Multiplayer top-down shooter built entirely from scratch in <strong>C++17</strong> and sfml.
   <strong>7,500+ lines </strong> of pure code across <strong> 50+ source files </strong>. Zero external engines.
 </p>
+
 
 <p align="center">
   <img src="https://img.shields.io/badge/C++-17-blue.svg?style=for-the-badge&logo=c%2B%2B" alt="C++">
@@ -11,6 +12,9 @@
   <img src="https://img.shields.io/badge/CMake-Build-red.svg?style=for-the-badge&logo=cmake" alt="CMake">
   <img src="https://img.shields.io/badge/Networking-UDP%2FTCP-purple.svg?style=for-the-badge" alt="Networking">
   <img src="https://img.shields.io/badge/Lines_of_Code-7500+-black.svg?style=for-the-badge" alt="7500+ LOC">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge" alt="License">
+
+
 </p>
 
 <br>
@@ -19,10 +23,10 @@
 
 ## Features
 
-* **Custom State Machine:** Memory-safe scene transitions (Menu, Lobby, Gameplay). [📖 Read more](docs/engine.md)
-* **Hybrid TCP/UDP Networking:** TCP for reliable lobby handshakes; custom UDP for zero-latency combat sync. [📖 Read more](docs/networking.md)
-* **Multithreaded Architecture:** Background network I/O ensures an unblocked, locked-60-FPS game loop. [📖 Read more](docs/multithreading.md)
-* **Lobby System:** Host/join rooms, nickname synchronization, and ready-up states. [📖 Read more](docs/lobby.md)
+* **Custom State Machine:** Memory-safe scene transitions (Menu, Lobby, Gameplay). [Read more](docs/engine.md)
+* **Hybrid TCP/UDP Networking:** TCP for reliable lobby handshakes; custom UDP for zero-latency combat sync. [Read more](docs/networking.md)
+* **Multithreaded Architecture:** Background network I/O ensures an unblocked, locked-60-FPS game loop. [Read more](docs/multithreading.md)
+* **Lobby System:** Host/join rooms, nickname synchronization, and ready-up states. [Read more](docs/lobby.md)
 * **1v1 Arena Combat:** Real-time top-down shooting, precise AABB collisions, and dynamic UI.
 * **CMake Build:** Clean, cross-platform configuration for instant compiling.
 
@@ -106,7 +110,7 @@ This project uses **CMake** for building. I have provided a simple helper script
 | **Left Click** | Fire |
 | **R** | Request rematch (when the round is over) |
 
-
+---
 ## Development Roadmap
 
 **Phase 1: Core Foundation (Completed)**
