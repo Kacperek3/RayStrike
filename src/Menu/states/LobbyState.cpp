@@ -234,7 +234,7 @@ void LobbyState::Init() {
     _backButtonText->setPosition(_backButton->getPosition().x + 70,
                                  _backButton->getPosition().y + 8);
 
-    _tesseract->setPosition(sf::Vector2f(980, 270));
+    _tesseract->setPosition(sf::Vector2f(1000, 270));
     _tesseract->setScale(0.15f);
     _tesseract->setColor(sf::Color(255, 223, 0, 120));
 
