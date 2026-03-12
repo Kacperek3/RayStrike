@@ -1,5 +1,6 @@
 #include "LobbyState.h"
-#include "GameplayTestState.h"
+#include "GameplayStateGuest.h"
+#include "GameplayStateHost.h"
 
 LobbyState::LobbyState(const LobbyConfig config) : _config(config), _data(config.data) {
     srand(static_cast<unsigned>(time(NULL)));
@@ -26,7 +27,6 @@ LobbyState::LobbyState(const LobbyConfig config) : _config(config), _data(config
     _clientNameText = new sf::Text();
     _clientHintText = new sf::Text();
 
-
     _backgroundInfoList = new sf::RectangleShape();
     _backgroundInfoListPanel = new sf::RectangleShape();
     _spacerInfoList = new sf::RectangleShape();
@@ -36,16 +36,13 @@ LobbyState::LobbyState(const LobbyConfig config) : _config(config), _data(config
     _numberOfRoundsText = new sf::Text();
     _timeLimitText = new sf::Text();
 
-
     _spacerToChat = new sf::RectangleShape();
     _tittleToChatText = new sf::Text();
-
 
     _titleText = new sf::Text();
 
     _tesseract = new Tesseract();
     _tesseractBackground = new Tesseract();
-
 
     _startGameButton = new sf::RectangleShape();
     _startGameButtonText = new sf::Text();
@@ -55,11 +52,12 @@ LobbyState::LobbyState(const LobbyConfig config) : _config(config), _data(config
     _configureButtonText = new sf::Text();
     _backButton = new sf::RectangleShape();
     _backButtonText = new sf::Text();
-    
-    _networkLobbyManager = new NetworkLobbyManager(_config.serverSocketForClient, _config.clientSocket);
+
+    _networkLobbyManager =
+        new NetworkLobbyManager(_config.serverSocketForClient, _config.clientSocket);
 }
 
-void LobbyState::Init(){
+void LobbyState::Init() {
     if (!_font.loadFromFile("assets/fonts/Orbitron/Orbitron-VariableFont_wght.ttf")) {
         std::cout << "Failed to load font" << std::endl;
     }
@@ -111,7 +109,7 @@ void LobbyState::Init(){
     _tittlePlayerList->setPosition(900, 188);
 
     _backgroundForHostList->setSize(sf::Vector2f(400, 65));
-    _backgroundForHostList->setFillColor(sf::Color(115, 123, 146 , 150));
+    _backgroundForHostList->setFillColor(sf::Color(115, 123, 146, 150));
     _backgroundForHostList->setPosition(780, 240);
     _hostNameText->setFont(_font);
     _hostNameText->setString(_config.hostName);
@@ -121,11 +119,11 @@ void LobbyState::Init(){
     _hostHintText->setFont(_font);
     _hostHintText->setString("Host");
     _hostHintText->setCharacterSize(16);
-    _hostHintText->setFillColor(sf::Color(230, 230, 230,100));
+    _hostHintText->setFillColor(sf::Color(230, 230, 230, 100));
     _hostHintText->setPosition(1030, 258);
 
     _backgroundForClientList->setSize(sf::Vector2f(400, 65));
-    _backgroundForClientList->setFillColor(sf::Color(115, 123, 146 , 150));
+    _backgroundForClientList->setFillColor(sf::Color(115, 123, 146, 150));
     _backgroundForClientList->setPosition(780, 303);
     _clientNameText->setFont(_font);
     _clientNameText->setString(_config.clientName);
@@ -135,9 +133,8 @@ void LobbyState::Init(){
     _clientHintText->setFont(_font);
     _clientHintText->setString("Client");
     _clientHintText->setCharacterSize(16);
-    _clientHintText->setFillColor(sf::Color(230, 230, 230,100));
+    _clientHintText->setFillColor(sf::Color(230, 230, 230, 100));
     _clientHintText->setPosition(1030, 321);
-
 
     _spacerToChat->setSize(sf::Vector2f(400, 3));
     _spacerToChat->setFillColor(sf::Color(255, 255, 255, 150));
@@ -156,8 +153,6 @@ void LobbyState::Init(){
     _sendMessageIcon->setTexture(_data->assetManager.GetTexture("sendIcon"));
     _sendMessageIcon->setPosition(1100, 760);
 
-
-
     _backgroundInfoList->setSize(sf::Vector2f(500, 320));
     _backgroundInfoList->setFillColor(sf::Color(58, 58, 58, 200));
     _backgroundInfoList->setPosition(150, 500);
@@ -174,92 +169,93 @@ void LobbyState::Init(){
     _tittleInfoList->setPosition(330, 513);
 
     _backgroundForNumberOfRounds->setSize(sf::Vector2f(500, 65));
-    _backgroundForNumberOfRounds->setFillColor(sf::Color(115, 123, 146 , 150));
+    _backgroundForNumberOfRounds->setFillColor(sf::Color(115, 123, 146, 150));
     _backgroundForNumberOfRounds->setPosition(150, 570);
     _numberOfRoundsText->setFont(_font);
     _gameSettings.numberOfRounds = 3;
-    _numberOfRoundsText->setString("Number of rounds: " + std::to_string(_gameSettings.numberOfRounds));
+    _numberOfRoundsText->setString("Number of rounds: " +
+                                   std::to_string(_gameSettings.numberOfRounds));
     _numberOfRoundsText->setCharacterSize(19);
     _numberOfRoundsText->setFillColor(sf::Color(230, 230, 230, 230));
     _numberOfRoundsText->setPosition(290, 588);
     _backgroundForTimeLimit->setSize(sf::Vector2f(500, 65));
-    _backgroundForTimeLimit->setFillColor(sf::Color(115, 123, 146 , 150));
+    _backgroundForTimeLimit->setFillColor(sf::Color(115, 123, 146, 150));
     _backgroundForTimeLimit->setPosition(150, 633);
     _timeLimitText->setFont(_font);
     _gameSettings.timeLimit = 60;
-    _timeLimitText->setString("Time limit: " + std::to_string(_gameSettings.timeLimit)+ " sec");
+    _timeLimitText->setString("Time limit: " + std::to_string(_gameSettings.timeLimit) + " sec");
     _timeLimitText->setCharacterSize(19);
     _timeLimitText->setFillColor(sf::Color(230, 230, 230, 230));
     _timeLimitText->setPosition(300, 651);
-
 
     _titleText->setFont(_font);
     _titleText->setString("Lobby");
     _titleText->setCharacterSize(50);
     _titleText->setFillColor(sf::Color::White);
-    _titleText->setPosition(_data->window.getSize().x,60);
-
+    _titleText->setPosition(_data->window.getSize().x, 60);
 
     _startGameButton->setSize(sf::Vector2f(250, 50));
-    _startGameButton->setFillColor(sf::Color(80, 150, 255,150));
+    _startGameButton->setFillColor(sf::Color(80, 150, 255, 150));
     _startGameButton->setPosition(sf::Vector2f(280, 170));
     _startGameButtonText->setFont(_font);
     _startGameButtonText->setString("Start Game");
     _startGameButtonText->setCharacterSize(30);
     _startGameButtonText->setFillColor(sf::Color::White);
-    _startGameButtonText->setPosition(_startGameButton->getPosition().x + 35, _startGameButton->getPosition().y + 8);
+    _startGameButtonText->setPosition(_startGameButton->getPosition().x + 35,
+                                      _startGameButton->getPosition().y + 8);
 
     _readyGameButton->setSize(sf::Vector2f(250, 50));
-    _readyGameButton->setFillColor(sf::Color(80, 150, 255,150));
+    _readyGameButton->setFillColor(sf::Color(80, 150, 255, 150));
     _readyGameButton->setPosition(sf::Vector2f(280, 260));
     _readyGameButtonText->setFont(_font);
     _readyGameButtonText->setString("Ready");
     _readyGameButtonText->setCharacterSize(30);
     _readyGameButtonText->setFillColor(sf::Color::White);
-    _readyGameButtonText->setPosition(_readyGameButton->getPosition().x + 70, _readyGameButton->getPosition().y + 8);
+    _readyGameButtonText->setPosition(_readyGameButton->getPosition().x + 70,
+                                      _readyGameButton->getPosition().y + 8);
 
     _configureButton->setSize(sf::Vector2f(250, 50));
-    _configureButton->setFillColor(sf::Color(80, 150, 255,150));
+    _configureButton->setFillColor(sf::Color(80, 150, 255, 150));
     _configureButton->setPosition(sf::Vector2f(280, 260));
     _configureButtonText->setFont(_font);
     _configureButtonText->setString("Configure");
     _configureButtonText->setCharacterSize(30);
     _configureButtonText->setFillColor(sf::Color::White);
-    _configureButtonText->setPosition(_configureButton->getPosition().x + 45, _configureButton->getPosition().y + 8);
+    _configureButtonText->setPosition(_configureButton->getPosition().x + 45,
+                                      _configureButton->getPosition().y + 8);
 
     _backButton->setSize(sf::Vector2f(250, 50));
-    _backButton->setFillColor(sf::Color(80, 150, 255,150));
+    _backButton->setFillColor(sf::Color(80, 150, 255, 150));
     _backButton->setPosition(sf::Vector2f(280, 350));
     _backButtonText->setFont(_font);
     _backButtonText->setString("Back");
     _backButtonText->setCharacterSize(30);
     _backButtonText->setFillColor(sf::Color::White);
-    _backButtonText->setPosition(_backButton->getPosition().x + 70, _backButton->getPosition().y + 8);
+    _backButtonText->setPosition(_backButton->getPosition().x + 70,
+                                 _backButton->getPosition().y + 8);
 
-    _tesseract->setPosition(sf::Vector2f(980, 270));
+    _tesseract->setPosition(sf::Vector2f(1000, 270));
     _tesseract->setScale(0.15f);
-    _tesseract->setColor(sf::Color(255, 223, 0,120));
+    _tesseract->setColor(sf::Color(255, 223, 0, 120));
 
     _tesseractBackground->setPosition(sf::Vector2f(620, 400));
     _tesseractBackground->setScale(3.0f);
     _tesseractBackground->setColor(sf::Color(255, 255, 255, 40));
 
-    auto storeButtonData = [&](sf::RectangleShape* btn, sf::Text* txt) {
+    auto storeButtonData = [&](sf::RectangleShape *btn, sf::Text *txt) {
         sf::Vector2f originalBtnPos = btn->getPosition();
         sf::Vector2f originalTxtPos = txt->getPosition();
         sf::FloatRect originalBounds = btn->getGlobalBounds();
         sf::Color originalColor = btn->getFillColor();
         _buttonData[btn] = {originalBtnPos, originalTxtPos, originalBounds, originalColor};
     };
-    storeButtonData(_backButton, _backButtonText);  
+    storeButtonData(_backButton, _backButtonText);
     storeButtonData(_startGameButton, _startGameButtonText);
     storeButtonData(_readyGameButton, _readyGameButtonText);
     storeButtonData(_configureButton, _configureButtonText);
-    
 
     _backButton->setPosition(1100, 700);
     _backButtonText->setPosition(1170, 708);
-
 }
 
 void LobbyState::HandleInput() {
@@ -270,24 +266,24 @@ void LobbyState::HandleInput() {
             _data->window.close();
             return;
         }
-        if(event.type == sf::Event::KeyPressed) {
+        if (event.type == sf::Event::KeyPressed) {
             if (event.key.code == sf::Keyboard::Enter && _chatTextField->getIsActive()) {
                 std::string message = _chatTextField->getInput();
-                if(!message.empty()){
+                if (!message.empty()) {
                     _networkLobbyManager->Send("__CHAT__" + message);
                     AddMessageToChat(_yourName + " : " + message, _yourColor);
                     _chatTextField->setInput("");
                 }
             }
         }
-        if(event.type == sf::Event::MouseButtonPressed ) {
+        if (event.type == sf::Event::MouseButtonPressed) {
             if (event.mouseButton.button == sf::Mouse::Left) {
                 sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
                 if (_backButton->getGlobalBounds().contains(mousePos)) {
                     _animationState = AnimationState::EXITING;
                     _networkLobbyManager->Send("__DISCONNECT__");
-                }
-                else if (_startGameButton->getGlobalBounds().contains(mousePos) && _config.isHost) {
+                } else if (_startGameButton->getGlobalBounds().contains(mousePos) &&
+                           _config.isHost) {
 
                     std::string message = "host is ready";
                     AddMessageToChat(message, sf::Color(0, 255, 0, 120), 14, 140);
@@ -296,18 +292,42 @@ void LobbyState::HandleInput() {
                     _hostHintText->setFillColor(sf::Color(0, 255, 0, 120));
                     _hostHintText->setString("Ready");
                     _isHostReady = true;
-                    
-                    if(_isHostReady && _isClientReady) {
-                        std::cout << "host odpala pierwszy wbija i wysyla info" << std::endl;
+
+                    if (_isHostReady && _isClientReady) {
+
                         std::string message = "Game starts in 5 seconds";
                         AddMessageToChat(message, sf::Color(0, 255, 0, 120), 14, 90);
                         _networkLobbyManager->Send("__START_GAME__" + message);
-                        // nowy state z grameplay
-                        sleep(1.5);
-                        _data->stateManager.AddState(StateRef(new GameplayTestState(_data,_config.serverSocketForClient, _config.clientSocket)),false);
-                    } 
-                }
-                else if (_readyGameButton->getGlobalBounds().contains(mousePos) && !_config.isHost) {
+                        std::cout << "Transitioning to Gameplay..." << std::endl;
+
+                        // 1. Wyciągnij socket (kopię numeru), zanim zniszczysz managera
+                        int socketToPass =
+                            _config.isHost ? _config.serverSocketForClient : _config.clientSocket;
+
+                        // 2. Uwolnij socket i zniszcz starego managera
+                        if (_networkLobbyManager) {
+                            _networkLobbyManager->ReleaseSocket(); // Ważne! Zatrzymuje wątek, ale
+                                                                   // nie zamyka połączenia
+                            delete _networkLobbyManager;
+                            _networkLobbyManager = nullptr;
+                        }
+
+                        // 3. Teraz bezpiecznie stwórz nowy stan gry na tym samym sockecie
+                        if (_config.isHost) {
+                            _data->stateManager.AddState(
+                                StateRef(new GameplayStateHost(
+                                    _data, socketToPass, _config.hostName, _config.clientName)),
+                                false);
+                        } else {
+                            _data->stateManager.AddState(
+                                StateRef(new GameplayStateGuest(
+                                    _data, socketToPass, _config.hostName, _config.clientName)),
+                                false);
+                        }
+                        return;
+                    }
+                } else if (_readyGameButton->getGlobalBounds().contains(mousePos) &&
+                           !_config.isHost) {
                     std::string message = "client is ready";
                     AddMessageToChat(message, sf::Color(0, 255, 0, 120), 14, 140);
 
@@ -316,66 +336,97 @@ void LobbyState::HandleInput() {
                     _clientHintText->setString("Ready");
                     _isClientReady = true;
 
-                    if(_isHostReady && _isClientReady) {
+                    if (_isHostReady && _isClientReady) {
                         std::string message = "Game starts in 5 seconds";
                         AddMessageToChat(message, sf::Color(0, 255, 0, 120), 14, 90);
                         _networkLobbyManager->Send("__START_GAME__" + message);
-                        // nowy state z grameplay
-                        std::cout << "klient odpala pierwszy wbija i wysyla info" << std::endl;
-                        _data->stateManager.AddState(StateRef(new GameplayTestState(_data,_config.serverSocketForClient, _config.clientSocket)),false);
-                    } 
-                }
-                else if (_configureButton->getGlobalBounds().contains(mousePos) && _config.isHost) {
+                        std::cout << "Transitioning to Gameplay..." << std::endl;
+
+                        int socketToPass =
+                            _config.isHost ? _config.serverSocketForClient : _config.clientSocket;
+
+                        if (_networkLobbyManager) {
+                            _networkLobbyManager->ReleaseSocket();
+                            delete _networkLobbyManager;
+                            _networkLobbyManager = nullptr;
+                        }
+
+                        if (_config.isHost) {
+                            _data->stateManager.AddState(
+                                StateRef(new GameplayStateHost(
+                                    _data, socketToPass, _config.hostName, _config.clientName)),
+                                false);
+                        } else {
+                            _data->stateManager.AddState(
+                                StateRef(new GameplayStateGuest(
+                                    _data, socketToPass, _config.hostName, _config.clientName)),
+                                false);
+                        }
+                        return;
+                    }
+                } else if (_configureButton->getGlobalBounds().contains(mousePos) &&
+                           _config.isHost) {
                     _animationState = AnimationState::EXITING;
                     _networkLobbyManager->Send("__CONFIGURE__");
-                }
-                else if(_plusNumOfRoundsIcon->getGlobalBounds().contains(mousePos) && _config.isHost){
-                    if(_gameSettings.numberOfRounds < 7){
+                } else if (_plusNumOfRoundsIcon->getGlobalBounds().contains(mousePos) &&
+                           _config.isHost) {
+                    if (_gameSettings.numberOfRounds < 7) {
                         _gameSettings.numberOfRounds++;
-                        _numberOfRoundsText->setString("Number of rounds: " + std::to_string(_gameSettings.numberOfRounds));
-                        _networkLobbyManager->Send("__NUMBER_OF_ROUNDS__" + std::to_string(_gameSettings.numberOfRounds));
-                        
-                        std::string message = "host changed number of rounds to " + std::to_string(_gameSettings.numberOfRounds);
+                        _numberOfRoundsText->setString(
+                            "Number of rounds: " + std::to_string(_gameSettings.numberOfRounds));
+                        _networkLobbyManager->Send("__NUMBER_OF_ROUNDS__" +
+                                                   std::to_string(_gameSettings.numberOfRounds));
+
+                        std::string message = "host changed number of rounds to " +
+                                              std::to_string(_gameSettings.numberOfRounds);
                         _networkLobbyManager->Send("__CHAT_CHANGED_CONFIG__" + message);
                         AddMessageToChat(message, sf::Color(255, 255, 255, 120), 14, 40);
                     }
-                }
-                else if(_minusNumOfRoundsIcon->getGlobalBounds().contains(mousePos) && _config.isHost){
-                    if(_gameSettings.numberOfRounds > 1){
+                } else if (_minusNumOfRoundsIcon->getGlobalBounds().contains(mousePos) &&
+                           _config.isHost) {
+                    if (_gameSettings.numberOfRounds > 1) {
                         _gameSettings.numberOfRounds--;
-                        _numberOfRoundsText->setString("Number of rounds: " + std::to_string(_gameSettings.numberOfRounds));
-                        _networkLobbyManager->Send("__NUMBER_OF_ROUNDS__" + std::to_string(_gameSettings.numberOfRounds));
+                        _numberOfRoundsText->setString(
+                            "Number of rounds: " + std::to_string(_gameSettings.numberOfRounds));
+                        _networkLobbyManager->Send("__NUMBER_OF_ROUNDS__" +
+                                                   std::to_string(_gameSettings.numberOfRounds));
 
-                        std::string message = "host changed number of rounds to " + std::to_string(_gameSettings.numberOfRounds);
+                        std::string message = "host changed number of rounds to " +
+                                              std::to_string(_gameSettings.numberOfRounds);
                         _networkLobbyManager->Send("__CHAT_CHANGED_CONFIG__" + message);
                         AddMessageToChat(message, sf::Color(255, 255, 255, 120), 14, 40);
                     }
-                }
-                else if(_plusTimeLimitIcon->getGlobalBounds().contains(mousePos) && _config.isHost){
-                    if(_gameSettings.timeLimit < 120){
-                        _gameSettings.timeLimit+=5;
-                        _timeLimitText->setString("Time limit: " + std::to_string(_gameSettings.timeLimit)+ " sec");
-                        _networkLobbyManager->Send("__TIME_LIMIT__" + std::to_string(_gameSettings.timeLimit));
+                } else if (_plusTimeLimitIcon->getGlobalBounds().contains(mousePos) &&
+                           _config.isHost) {
+                    if (_gameSettings.timeLimit < 120) {
+                        _gameSettings.timeLimit += 5;
+                        _timeLimitText->setString(
+                            "Time limit: " + std::to_string(_gameSettings.timeLimit) + " sec");
+                        _networkLobbyManager->Send("__TIME_LIMIT__" +
+                                                   std::to_string(_gameSettings.timeLimit));
 
-                        std::string message = "host changed time limit to " + std::to_string(_gameSettings.timeLimit) + " sec";
+                        std::string message = "host changed time limit to " +
+                                              std::to_string(_gameSettings.timeLimit) + " sec";
                         _networkLobbyManager->Send("__CHAT_CHANGED_CONFIG__" + message);
                         AddMessageToChat(message, sf::Color(255, 255, 255, 120), 14, 40);
                     }
-                }
-                else if(_minusTimeLimitIcon->getGlobalBounds().contains(mousePos) && _config.isHost){
-                    if(_gameSettings.timeLimit > 45){
-                        _gameSettings.timeLimit-=5;
-                        _timeLimitText->setString("Time limit: " + std::to_string(_gameSettings.timeLimit) + " sec");
-                        _networkLobbyManager->Send("__TIME_LIMIT__" + std::to_string(_gameSettings.timeLimit));
+                } else if (_minusTimeLimitIcon->getGlobalBounds().contains(mousePos) &&
+                           _config.isHost) {
+                    if (_gameSettings.timeLimit > 45) {
+                        _gameSettings.timeLimit -= 5;
+                        _timeLimitText->setString(
+                            "Time limit: " + std::to_string(_gameSettings.timeLimit) + " sec");
+                        _networkLobbyManager->Send("__TIME_LIMIT__" +
+                                                   std::to_string(_gameSettings.timeLimit));
 
-                        std::string message = "host changed time limit to " + std::to_string(_gameSettings.timeLimit) + " sec";
+                        std::string message = "host changed time limit to " +
+                                              std::to_string(_gameSettings.timeLimit) + " sec";
                         _networkLobbyManager->Send("__CHAT_CHANGED_CONFIG__" + message);
                         AddMessageToChat(message, sf::Color(255, 255, 255, 120), 14, 40);
                     }
-                }
-                else if(_sendMessageIcon->getGlobalBounds().contains(mousePos)){
+                } else if (_sendMessageIcon->getGlobalBounds().contains(mousePos)) {
                     std::string message = _chatTextField->getInput();
-                    if(!message.empty()){
+                    if (!message.empty()) {
                         _networkLobbyManager->Send("__CHAT__" + message);
                         AddMessageToChat(_yourName + " : " + message, _yourColor);
                         _chatTextField->setInput("");
@@ -387,8 +438,9 @@ void LobbyState::HandleInput() {
     }
 }
 
-void LobbyState::AddMessageToChat(const std::string& message, const sf::Color& color, int fontSize, int offsetX) {
-    sf::Text* newMsg = new sf::Text();
+void LobbyState::AddMessageToChat(const std::string &message, const sf::Color &color, int fontSize,
+                                  int offsetX) {
+    sf::Text *newMsg = new sf::Text();
     newMsg->setFont(_font);
     newMsg->setString(message);
     newMsg->setCharacterSize(fontSize);
@@ -396,15 +448,15 @@ void LobbyState::AddMessageToChat(const std::string& message, const sf::Color& c
 
     const float maxWidth = 380.0f;
     sf::FloatRect textRect = newMsg->getLocalBounds();
-    if(textRect.width > maxWidth) {
+    if (textRect.width > maxWidth) {
         std::string wrappedText;
         std::string currentLine;
         std::istringstream iss(message);
         std::string word;
-        
-        while(iss >> word) {
+
+        while (iss >> word) {
             sf::Text tempLine(currentLine + word + " ", _font, 18);
-            if(tempLine.getLocalBounds().width < maxWidth) {
+            if (tempLine.getLocalBounds().width < maxWidth) {
                 currentLine += word + " ";
             } else {
                 wrappedText += currentLine + "\n";
@@ -417,7 +469,7 @@ void LobbyState::AddMessageToChat(const std::string& message, const sf::Color& c
 
     _chatMessages.push_back({newMsg, offsetX});
 
-    if(_chatMessages.size() > 10) {
+    if (_chatMessages.size() > 10) {
         delete _chatMessages.front().text;
         _chatMessages.erase(_chatMessages.begin());
     }
@@ -430,37 +482,37 @@ void LobbyState::UpdateChatPositions() {
     const float lineHeight = 25.0f;
     float currentY = startY;
 
-    for(auto it = _chatMessages.rbegin(); it != _chatMessages.rend(); ++it) {
-        MessageData& msgData = *it;
-        sf::Text* msg = msgData.text;
-        
+    for (auto it = _chatMessages.rbegin(); it != _chatMessages.rend(); ++it) {
+        MessageData &msgData = *it;
+        sf::Text *msg = msgData.text;
+
         int numLines = std::count(msg->getString().begin(), msg->getString().end(), '\n') + 1;
         msg->setPosition(baseX + msgData.offsetX, currentY - (numLines * lineHeight));
-        
+
         currentY -= numLines * lineHeight + 5.0f;
     }
 }
 
 void LobbyState::Update() {
+    if (!_networkLobbyManager)
+        return;
     _tesseract->update();
     _tesseractBackground->update();
     // Animation logic
-    if(_animationState == AnimationState::ENTERING) {
+    if (_animationState == AnimationState::ENTERING) {
         enteringAnimation();
-    } else if(_animationState == AnimationState::EXITING) {
+    } else if (_animationState == AnimationState::EXITING) {
         exitingAnimation();
     } else {
         standartAnimation();
     }
-
 
     std::string msg;
     while (_networkLobbyManager->WaitForMessage(msg, 0)) {
         if (msg.find("__DISCONNECT") != std::string::npos) {
             _animationState = AnimationState::EXITING;
             break;
-        }
-        else if (msg.find("__NUMBER_OF_ROUNDS__") != std::string::npos) {
+        } else if (msg.find("__NUMBER_OF_ROUNDS__") != std::string::npos) {
             std::string prefix = "__NUMBER_OF_ROUNDS__";
             size_t pos = msg.find(prefix);
             if (pos != std::string::npos) {
@@ -468,13 +520,13 @@ void LobbyState::Update() {
                 try {
                     int newRounds = std::stoi(numberStr);
                     _gameSettings.numberOfRounds = newRounds;
-                    _numberOfRoundsText->setString("Number of rounds: " + std::to_string(newRounds));
-                } catch (const std::exception& e) {
+                    _numberOfRoundsText->setString("Number of rounds: " +
+                                                   std::to_string(newRounds));
+                } catch (const std::exception &e) {
                     std::cerr << "Error parsing number of rounds: " << e.what() << std::endl;
                 }
             }
-        }
-        else if (msg.find("__TIME_LIMIT__") != std::string::npos) {
+        } else if (msg.find("__TIME_LIMIT__") != std::string::npos) {
             std::string prefix = "__TIME_LIMIT__";
             size_t pos = msg.find(prefix);
             if (pos != std::string::npos) {
@@ -482,21 +534,20 @@ void LobbyState::Update() {
                 try {
                     int newTimeLimit = std::stoi(numberStr);
                     _gameSettings.timeLimit = newTimeLimit;
-                    _timeLimitText->setString("Time limit: " + std::to_string(newTimeLimit)+ " sec");
-                } catch (const std::exception& e) {
+                    _timeLimitText->setString("Time limit: " + std::to_string(newTimeLimit) +
+                                              " sec");
+                } catch (const std::exception &e) {
                     std::cerr << "Error parsing time limit: " << e.what() << std::endl;
                 }
             }
-        }
-        else if (msg.find("__CHAT__") != std::string::npos) {
+        } else if (msg.find("__CHAT__") != std::string::npos) {
             std::string prefix = "__CHAT__";
             size_t pos = msg.find(prefix);
             if (pos != std::string::npos) {
                 std::string receivedMessage = msg.substr(pos + prefix.length());
                 AddMessageToChat(_enemyName + " : " + receivedMessage, _enemyColor);
             }
-        }
-        else if(msg.find("__HOST_READY__") != std::string::npos) {
+        } else if (msg.find("__HOST_READY__") != std::string::npos) {
             std::string prefix = "__HOST_READY__";
             size_t pos = msg.find(prefix);
             if (pos != std::string::npos) {
@@ -507,8 +558,7 @@ void LobbyState::Update() {
                 AddMessageToChat(receivedMessage, sf::Color(0, 255, 0, 120), 14, 140);
             }
             _isHostReady = true;
-        }
-        else if(msg.find("__CLIENT_READY__") != std::string::npos) {
+        } else if (msg.find("__CLIENT_READY__") != std::string::npos) {
             std::string prefix = "__CLIENT_READY__";
             size_t pos = msg.find(prefix);
             if (pos != std::string::npos) {
@@ -519,31 +569,50 @@ void LobbyState::Update() {
                 AddMessageToChat(receivedMessage, sf::Color(0, 255, 0, 120), 14, 140);
             }
             _isClientReady = true;
-        }
-        else if(msg.find("__CHAT_CHANGED_CONFIG__") != std::string::npos) {
+        } else if (msg.find("__CHAT_CHANGED_CONFIG__") != std::string::npos) {
             std::string prefix = "__CHAT_CHANGED_CONFIG__";
             size_t pos = msg.find(prefix);
             if (pos != std::string::npos) {
                 std::string receivedMessage = msg.substr(pos + prefix.length());
                 AddMessageToChat(receivedMessage, sf::Color(255, 255, 255, 120), 14, 40);
             }
-        }
-        else if(msg.find("__START_GAME__") != std::string::npos) {
+        } else if (msg.find("__START_GAME__") != std::string::npos) {
             std::string prefix = "__START_GAME__";
             size_t pos = msg.find(prefix);
             if (pos != std::string::npos) {
                 std::string receivedMessage = msg.substr(pos + prefix.length());
                 AddMessageToChat(receivedMessage, sf::Color(0, 255, 0, 120), 14, 90);
             }
-            _data->stateManager.AddState(StateRef(new GameplayTestState(_data,_config.serverSocketForClient, _config.clientSocket)), false);
+
+            std::cout << "Transitioning to Gameplay..." << std::endl;
+
+            int socketToPass =
+                _config.isHost ? _config.serverSocketForClient : _config.clientSocket;
+
+            if (_networkLobbyManager) {
+                _networkLobbyManager->ReleaseSocket();
+                delete _networkLobbyManager;
+                _networkLobbyManager = nullptr;
+            }
+
+            if (_config.isHost) {
+                _data->stateManager.AddState(
+                    StateRef(new GameplayStateHost(_data, socketToPass, _config.hostName,
+                                                   _config.clientName)),
+                    false);
+            } else {
+                _data->stateManager.AddState(
+                    StateRef(new GameplayStateGuest(_data, socketToPass, _config.hostName,
+                                                    _config.clientName)),
+                    false);
+            }
+            return;
             //_animationState = AnimationState::EXITING;
         }
     }
 }
 
-
 void LobbyState::exitingAnimation() {
-    
 
     sf::Vector2f currentPos = _titleText->getPosition();
 
@@ -556,7 +625,7 @@ void LobbyState::exitingAnimation() {
         _animationState = AnimationState::ENTERING;
         _data->stateManager.RemoveState();
     }
-    
+
     return;
 }
 
@@ -564,19 +633,19 @@ void LobbyState::enteringAnimation() {
     bool allButtonsOffScreen = true;
     bool allTextFieldsOffScreen = true;
 
+    for (auto &[button, data] : _buttonData) {
+        auto &[originalBtnPos, originalTxtPos, originalBounds, originalColor] = data;
 
-    for (auto& [button, data] : _buttonData) {
-        auto& [originalBtnPos, originalTxtPos, originalBounds, originalColor] = data;
-        
         sf::Vector2f newPos = button->getPosition();
         newPos.x -= _exitAnimationSpeed;
         button->setPosition(newPos);
-        _titleText->setPosition(_titleText->getPosition().x - _exitAnimationSpeed, _titleText->getPosition().y);
+        _titleText->setPosition(_titleText->getPosition().x - _exitAnimationSpeed,
+                                _titleText->getPosition().y);
 
+        sf::Text *text = nullptr;
+        if (button == _backButton)
+            text = _backButtonText;
 
-        sf::Text* text = nullptr;
-        if (button == _backButton) text = _backButtonText;
-        
         if (text) {
             sf::Vector2f textPos = text->getPosition();
             textPos.x -= _exitAnimationSpeed;
@@ -593,66 +662,63 @@ void LobbyState::enteringAnimation() {
 
     if (currentPos.x > 0) {
         currentPos.x -= _exitAnimationSpeed;
-        if (currentPos.x <= 550){
+        if (currentPos.x <= 550) {
             currentPos.x = 550;
             _animationState = AnimationState::NONE;
         }
-        
-        _titleText->setPosition(currentPos);
 
+        _titleText->setPosition(currentPos);
     }
 }
 
-void LobbyState::standartAnimation(){
+void LobbyState::standartAnimation() {
     sf::Vector2f mousePos = _data->inputManager.GetMousePosition(_data->window);
 
-
-    if(_data->inputManager.IsSpriteHoverAccurate(*_plusNumOfRoundsIcon, _data->window,45)){
+    if (_data->inputManager.IsSpriteHoverAccurate(*_plusNumOfRoundsIcon, _data->window, 45)) {
         _plusNumOfRoundsIcon->setTexture(_data->assetManager.GetTexture("plusIconHover"));
-    }
-    else{
+    } else {
         _plusNumOfRoundsIcon->setTexture(_data->assetManager.GetTexture("plusIcon"));
     }
-    if(_data->inputManager.IsSpriteHoverAccurate(*_plusTimeLimitIcon, _data->window,45)){
+    if (_data->inputManager.IsSpriteHoverAccurate(*_plusTimeLimitIcon, _data->window, 45)) {
         _plusTimeLimitIcon->setTexture(_data->assetManager.GetTexture("plusIconHover"));
-    }
-    else{
+    } else {
         _plusTimeLimitIcon->setTexture(_data->assetManager.GetTexture("plusIcon"));
     }
 
-    if(_data->inputManager.IsSpriteHoverAccurate(*_sendMessageIcon, _data->window,20)){
+    if (_data->inputManager.IsSpriteHoverAccurate(*_sendMessageIcon, _data->window, 20)) {
         _sendMessageIcon->setTexture(_data->assetManager.GetTexture("sendIconHover"));
-    }
-    else{
+    } else {
         _sendMessageIcon->setTexture(_data->assetManager.GetTexture("sendIcon"));
     }
-     
-
-
 
     const float hoverOffset = 10.f;
     const sf::Color hoverColor(0, 59, 190);
-    for (auto& [button, data] : _buttonData) {
-        auto& [originalBtnPos, originalTxtPos, originalBounds, originalColor] = data;
-        sf::Text* text = nullptr;
+    for (auto &[button, data] : _buttonData) {
+        auto &[originalBtnPos, originalTxtPos, originalBounds, originalColor] = data;
+        sf::Text *text = nullptr;
 
-        if (button == _backButton) text = _backButtonText;
-        else if (button == _startGameButton) text = _startGameButtonText;
-        else if (button == _readyGameButton) text = _readyGameButtonText;
-        else if (button == _configureButton) text = _configureButtonText;
-        
+        if (button == _backButton)
+            text = _backButtonText;
+        else if (button == _startGameButton)
+            text = _startGameButtonText;
+        else if (button == _readyGameButton)
+            text = _readyGameButtonText;
+        else if (button == _configureButton)
+            text = _configureButtonText;
+
         if (originalBounds.contains(mousePos)) {
             button->setPosition(originalBtnPos.x, originalBtnPos.y);
             button->setFillColor(hoverColor);
-            if (text) text->setPosition(originalTxtPos.x, originalTxtPos.y);
+            if (text)
+                text->setPosition(originalTxtPos.x, originalTxtPos.y);
         } else {
             button->setPosition(originalBtnPos);
             button->setFillColor(originalColor);
-            if (text) text->setPosition(originalTxtPos);
+            if (text)
+                text->setPosition(originalTxtPos);
         }
     }
 }
-
 
 void LobbyState::Draw() {
     _data->window.clear();
@@ -693,7 +759,7 @@ void LobbyState::Draw() {
     _data->window.draw(*_hostIcon);
     _data->window.draw(*_clientIcon);
 
-    if(_config.isHost){
+    if (_config.isHost) {
         _data->window.draw(*_startGameButton);
         _data->window.draw(*_startGameButtonText);
         _data->window.draw(*_configureButton);
@@ -702,18 +768,16 @@ void LobbyState::Draw() {
         _data->window.draw(*_minusNumOfRoundsIcon);
         _data->window.draw(*_plusTimeLimitIcon);
         _data->window.draw(*_minusTimeLimitIcon);
-    }
-    else if(!_config.isHost){
+    } else if (!_config.isHost) {
         _data->window.draw(*_readyGameButton);
         _data->window.draw(*_readyGameButtonText);
     }
 
-    for(auto& msgData : _chatMessages) {
+    for (auto &msgData : _chatMessages) {
         _data->window.draw(*msgData.text);
     }
     _data->window.display();
 }
-
 
 LobbyState::~LobbyState() {
     delete _backgroundTexture;
@@ -756,16 +820,14 @@ LobbyState::~LobbyState() {
     delete _tittleToChatText;
     delete _chatTextField;
     delete _sendMessageIcon;
-    for(auto& msgData : _chatMessages) {
+    for (auto &msgData : _chatMessages) {
         delete msgData.text;
     }
     _chatMessages.clear();
     delete _networkLobbyManager;
-
 }
 
-
 void LobbyState::ClearObjects() {
-   // _data->assetManager.clearAssets();
+    // _data->assetManager.clearAssets();
     //_data->soundManager.ClearSounds();
 }

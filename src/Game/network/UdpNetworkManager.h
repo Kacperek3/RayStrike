@@ -10,6 +10,8 @@
 #include <netinet/in.h>
 #include <cstring>
 #include <iostream>
+#include <arpa/inet.h>   
+#include <vector>
 
 class UdpNetworkManager {
 public:
@@ -21,12 +23,13 @@ public:
     bool HasMessages();
     std::string PopMessage();
     bool WaitForMessage(std::string& outMessage, int timeoutMs);
-
+    ssize_t recv_all(int sockfd, void *buf, size_t len, int flags, int timeoutMs = 5000); 
     bool IsConnected() const { return _connected; }
 
 private:
     void ReceiveThreadFunc();
     bool SetupUdpConnection();
+    bool SyncTcpHandshake();
 
     int _tcpSocket;
     int _udpSocket = -1;
