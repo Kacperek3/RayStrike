@@ -19,58 +19,82 @@
 
 <br>
 
+
 ---
 
+## Why RayStrike?
+
+> [!IMPORTANT]
+> **Zero accounts. Zero 50GB updates. Zero matchmaking queues.**
+>
+> RayStrike is a pure, plug-and-play 1v1 arena shooter built for immediate action. Launch the game, instantly find your friend's LAN lobby, and settle your scores. Perfect for a 15-minute break or a quick LAN party showdown.
+
+---
 ## Features
 
-* **Custom State Machine:** Memory-safe scene transitions (Menu, Lobby, Gameplay). [Read more](docs/engine.md)
-* **Hybrid TCP/UDP Networking:** TCP for reliable lobby handshakes; custom UDP for zero-latency combat sync. [Read more](docs/networking.md)
+* **Custom State Machine:** Memory-safe scene transitions. [Read more](docs/engine.md)
+* **Custom TCP/UDP Communication Protocol:** Built from scratch using raw sockets. TCP ensures reliable lobby connections, while a custom UDP protocol guarantees zero-latency combat sync. [Read more](docs/networking.md)
 * **Multithreaded Architecture:** Background network I/O ensures an unblocked, locked-60-FPS game loop. [Read more](docs/multithreading.md)
 * **Lobby System:** Host/join rooms, nickname synchronization, and ready-up states. [Read more](docs/lobby.md)
-* **1v1 Arena Combat:** Real-time top-down shooting, precise AABB collisions, and dynamic UI.
-* **CMake Build:** Clean, cross-platform configuration for instant compiling.
+* **1v1 Arena Combat:** Fast-paced top-down shooting. Features custom hit detection, smooth movement, and a clean UI. [Read more](docs/game.md)
 
 ---
 
-##  Multiplayer in Action
+## Multiplayer in Action
 
+<h3 align="center">1. LAN Auto-Discovery & Match Creation</h3>
 <table align="center">
   <tr>
-    <th align="center"> Host (Creating Match)</th>
-    <th align="center"> Guest (Joining Match)</th>
+    <th align="center">Host POV (Creating Match)</th>
+    <th align="center">Guest POV (Joining Match)</th>
   </tr>
   <tr>
     <td width="50%">
-      <img src="assets/gifs/LobbyCreation.gif" alt="Host creating room" width="100%"/>
+      <img src="assets/gifs/LobbyCreation.gif" alt="Host opening a UDP broadcast room" width="100%"/>
     </td>
     <td width="50%">
-      <img src="assets/gifs/LobbyJoin.gif" alt="Guest joining room" width="100%"/>
+      <img src="assets/gifs/LobbyJoin.gif" alt="Guest finding room via server browser" width="100%"/>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <i>The Host broadcasts the room on the local network while the Guest's browser detects it instantly. Zero manual IP typing.</i>
     </td>
   </tr>
 </table>
-<table align="center">
-  <tr>
-    <th align="center"> Host (Lobby)</th>
-    <th align="center"> Guest (Lobby)</th>
-  </tr>
-  <tr>
-    <td width="50%">
-      <img src="assets/gifs/LobbyHost.gif" alt="Host creating room" width="100%"/>
-    </td>
-    <td width="50%">
-      <img src="assets/gifs/LobbyGuest1.gif" alt="Guest joining room" width="100%"/>
-    </td>
-  </tr>
-</table>
-
 
 <br>
 
-<h3 align="center">Real-Time Arena Combat</h3>
-<p align="center">
-  <img src="assets/gifs/Gameplay1.png" alt="Gameplay Showcase" width="85%"/>
-</p>
+<h3 align="center">2. TCP Synchronized Lobby</h3>
+<table align="center">
+  <tr>
+    <th align="center">Host POV (Configuring Match)</th>
+    <th align="center">Guest POV (Live Updates)</th>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="assets/gifs/LobbyHost.gif" alt="Host changing game settings" width="100%"/>
+    </td>
+    <td width="50%">
+      <img src="assets/gifs/LobbyGuest1.gif" alt="Guest receiving live settings update" width="100%"/>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <i>Game configurations, ready states, and chat messages are synchronized over TCP before the match begins.</i>
+    </td>
+  </tr>
+</table>
 
+<br>
+
+<h3 align="center">3. Real-Time Arena Combat</h3>
+<p align="center">
+  <img src="assets/gifs/Gameplay1.png" alt="Fast-paced 1v1 combat showcase" width="85%"/>
+</p>
+<p align="center">
+  <i>Combat runs on custom UDP sockets to ensure real-time shooting and reliable hit registration.</i>
+</p>
 
 ---
 ## ️ Installation & Building
@@ -123,6 +147,26 @@ This project uses **CMake** for building. I have provided a simple helper script
 - [ ] New Maps and Obstacles
 - [ ] Bullet Ricochets and Power-ups
 
+
+---
+
+## Contributing
+
+RayStrike is an open-source passion project. Whether you want to fix a bug, optimize the network code, or add a new weapon from the roadmap, your help is highly welcome.
+
+If you want to contribute, please follow the standard GitHub workflow:
+1. Fork the repository.
+2. Create a new branch for your feature
+3. Commit your changes
+4. Push to the branch 
+5. Open a Pull Request.
+
+## Credits & Acknowledgements
+
+This game was built from scratch as a collaborative effort. A massive thank you to my co-developer who helped bring this project to life:
+
+* **Kacperek3** – Project Lead: Custom networking stack, combat mechanics, and UI implementation.
+* **Pete939** – Core Contributor: Engineered base game engine.
 
 ---
 
