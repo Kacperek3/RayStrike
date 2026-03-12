@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/SFML-2.6-green.svg?style=for-the-badge" alt="SFML">
   <img src="https://img.shields.io/badge/CMake-Build-red.svg?style=for-the-badge&logo=cmake" alt="CMake">
   <img src="https://img.shields.io/badge/Networking-UDP%2FTCP-purple.svg?style=for-the-badge" alt="Networking">
-  <img src="https://img.shields.io/badge/Lines_of_Code-7500+-black.svg?style=for-the-badge" alt="7500+ LOC">
+  <img src="https://img.shields.io/badge/Lines_of_Code-7500+-read.svg?style=for-the-badge" alt="7500+ LOC">
     <img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge" alt="License">
 
 
